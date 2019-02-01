@@ -1,6 +1,7 @@
 /**
   ******************************************************************************
   * @file    GPIO/GPIO_IOToggle/Src/main.c
+  * @author  modified by Henryk Paluch of Pickering Interfaces, Ltd.
   * @author  MCD Application Team
   * @brief   currently it toggles LEDs on PB0, PF13 and PF14 at different speed
   ******************************************************************************
@@ -45,6 +46,21 @@
   */
 
 /* Private typedef -----------------------------------------------------------*/
+
+// complete port definition (GPIO address + Pin Number)
+typedef struct {
+	GPIO_TypeDef  *addr;
+	uint32_t pin;
+} hpstm_port_def_t;
+
+// complete port (etc) configuration for specific 93c86 FLASH
+typedef struct {
+	hpstm_port_def_t csPort;
+	hpstm_port_def_t clkPort;
+	hpstm_port_def_t dPort;
+	hpstm_port_def_t qPort;
+} hpstm_93c_conf_t;
+
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -55,6 +71,7 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
+// just copied from ..\..\..\UART\UART_Printf\Src\main.c
 static void Error_Handler(void)
 {
   /* Turn "error" LED3 on and wait forever */
@@ -80,25 +97,25 @@ static uint32_t MyInputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin)
 }
 
 
-static void MyInitOutputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
+static void HpStmInitOutputGPIO(hpstm_port_def_t *portDef){
 	  /* -2- Configure IO in output push-pull mode to drive external LEDs */
 	  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
 	  GPIO_InitStruct.Pull  = GPIO_NOPULL; // GPIO_PULLUP;
 	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
-	  GPIO_InitStruct.Pin = myPin;
-	  HAL_GPIO_Init(myGPIO, &GPIO_InitStruct);
+	  GPIO_InitStruct.Pin = portDef->pin;
+	  HAL_GPIO_Init(portDef->addr, &GPIO_InitStruct);
 	  // ensure that output is set to 0
-	  MyOutputValueGPIO(myGPIO,myPin,0);
+	  MyOutputValueGPIO(portDef->addr,portDef->pin,0);
 }
 
-static void MyInitInputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
+static void HpStmInitInputGPIO(hpstm_port_def_t *portDef){
 	// from stm32f7xx_nucleo_144.c
-    GPIO_InitStruct.Pin = myPin;
+    GPIO_InitStruct.Pin = portDef->pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull =  GPIO_PULLUP; //  GPIO_PULLDOWN;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    HAL_GPIO_Init(myGPIO, &GPIO_InitStruct);
+    HAL_GPIO_Init(portDef->addr, &GPIO_InitStruct);
 
 }
 
@@ -204,12 +221,6 @@ static void read_all_flash(void){
 		uint32_t val1= MyReadValue16((uint32_t)j);
 		uint32_t val2= MyReadValue16((uint32_t)j+1);
 
-		uint32_t b1,b2,b3,b4;
-		b1 = val1 & 0xff;
-		b2 = (val1 >> 8) & 0xff;
-		b3 = val2 & 0xff;
-		b4 = (val2 >> 8) & 0xff;
-
 		data32[i] = (val2 & 0xffff) | ( (val1 & 0xffff) << 16);
 	}
 }
@@ -255,15 +266,21 @@ int main(void)
   __HAL_RCC_GPIOB_CLK_ENABLE(); // probably not needed because BSP_LED_Init();
   __HAL_RCC_GPIOF_CLK_ENABLE();
 
+  hpstm_93c_conf_t my93c86Conf = {
+		  .csPort  = { GPIOB, GPIO_PIN_0 },
+		  .clkPort = { GPIOF, GPIO_PIN_13},
+		  .dPort   = { GPIOF, GPIO_PIN_14},
+		  .qPort   = { GPIOF, GPIO_PIN_15}
+  };
 
   // PB0 wil be CS of 93Cxx
-  MyInitOutputGPIO(GPIOB, GPIO_PIN_0);
+  HpStmInitOutputGPIO(&my93c86Conf.csPort);
   // PF13 will be CLK of 93Cxx
-  MyInitOutputGPIO(GPIOF, GPIO_PIN_13);
+  HpStmInitOutputGPIO(&my93c86Conf.clkPort);
   // PF14 will be D of 93Cxx
-  MyInitOutputGPIO(GPIOF, GPIO_PIN_14);
+  HpStmInitOutputGPIO(&my93c86Conf.dPort);
   // PF15 this will be Q (input) from 93Cxxx
-  MyInitInputGPIO(GPIOF, GPIO_PIN_15);
+  HpStmInitInputGPIO(&my93c86Conf.qPort);
 
 
   // Blue LED2 means = reading flash in progress...
