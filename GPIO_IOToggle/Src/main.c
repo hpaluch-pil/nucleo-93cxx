@@ -86,16 +86,10 @@ static void MyDelay(uint32_t myDelay){
 	HAL_Delay(myDelay);
 }
 
-static void MyOutputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin, uint32_t active){
-	 GPIO_PinState st = active ? GPIO_PIN_SET : GPIO_PIN_RESET;
-	 HAL_GPIO_WritePin(myGPIO, myPin, st);
-}
-
-static uint32_t MyInputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin)
+static uint32_t HpStmInputValueGPIO(hpstm_port_def_t *portDef)
 {
-  return HAL_GPIO_ReadPin(myGPIO, myPin);
+  return HAL_GPIO_ReadPin(portDef->addr, portDef->pin);
 }
-
 
 static void HpStmOutputValueGPIO(hpstm_port_def_t *portDef, uint32_t active){
 	 GPIO_PinState st = active ? GPIO_PIN_SET : GPIO_PIN_RESET;
@@ -111,8 +105,8 @@ static void HpStmInitOutputGPIO(hpstm_port_def_t *portDef){
 
 	  GPIO_InitStruct.Pin = portDef->pin;
 	  HAL_GPIO_Init(portDef->addr, &GPIO_InitStruct);
-	  // ensure that output is set to 0
-	  MyOutputValueGPIO(portDef->addr,portDef->pin,0);
+	  // ensure that initial output is set to 0
+	  HpStmOutputValueGPIO(portDef,0);
 }
 
 static void HpStmInitInputGPIO(hpstm_port_def_t *portDef){
@@ -144,32 +138,39 @@ static void HpStm93cDisableCS(hpstm_93c_conf_t *flashConf){
 	  MyDelay(1);
 }
 
-static uint32_t MyBitOut(uint32_t bitVal){
+static uint32_t HpStm93cBitOut(hpstm_93c_conf_t *flashConf, uint32_t bitVal){
 	  uint32_t inVal=0;
 
- 	  // PF14 will be D of 93Cxx
-	  MyOutputValueGPIO(GPIOF, GPIO_PIN_14,bitVal);
+ 	  // output value to D of 93Cxx
+	  HpStmOutputValueGPIO(&flashConf->dPort,bitVal);
 	  MyDelay(1);
-	  // toggle CLK on and off
-	  // PF13 will be CLK of 93Cxx
-	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,1);
+
+	  // toggle CLK on for 93Cxx
+	  HpStmOutputValueGPIO(&flashConf->clkPort,1);
 	  MyDelay(1);
-	  // sample Q output after CLK raise - it is sometime important...
-	  inVal = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
-	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,0);
+
+	  // sample Q output after CLK raise - it is sometimes important...
+	  inVal = HpStmInputValueGPIO(&flashConf->qPort);
+
+	  // toggle CLK off
+	  HpStmOutputValueGPIO(&flashConf->clkPort,0);
 	  MyDelay(1);
+
 	  return inVal;
 }
 
-static uint32_t MyBitIn(void){
+static uint32_t HpStm93cBitIn(hpstm_93c_conf_t *flashConf){
 	  uint32_t bitVal=0;
 
-	  // PF13 will be CLK of 93Cxx
-	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,1);
+	  // CLK on for 93Cxx
+	  HpStmOutputValueGPIO(&flashConf->clkPort,1);
 	  MyDelay(1);
-	  bitVal = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
-	  // PF13 will be CLK of 93Cxx
-	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,0);
+
+	  // sample Q of 93Cxx
+	  bitVal = HpStmInputValueGPIO(&flashConf->qPort);
+
+	  // CLK off for 93Cxx
+	  HpStmOutputValueGPIO(&flashConf->clkPort,0);
 	  MyDelay(1);
 	  return bitVal;
 }
@@ -184,27 +185,27 @@ static const uint32_t MY_CMD_READ  = ( 0x2 << 8) | (1 << 10);
 
 static const uint32_t MY_ADDR_MASK = 0xff;
 
-static uint32_t MySendCommand(uint32_t cmdVal){
+static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t cmdVal){
 	int i=0;
 	uint32_t lastDataIn=0;
 
 	// WARNING! i must be signed to avoid infinity cycle
 	for(i=MY_CMD_BITS-1;i>=0;i--){
 		uint32_t bitVal = ( (cmdVal & (1 << i)) ? 1 : 0);
-		lastDataIn = MyBitOut(bitVal);
+		lastDataIn = HpStm93cBitOut(flashConf, bitVal);
 	}
 	return lastDataIn;
 }
 
 
-static uint32_t MyReadValue16(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
+static uint32_t HpStm93cReadValue16(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
 	int i=0;
 	uint32_t lastDataIn=0;
 	uint32_t val16=0;
 	uint32_t cmd = (myAddr & MY_ADDR_MASK) | MY_CMD_READ;
 	HpStm93cEnableCS(flashConf);
 
-	lastDataIn = MySendCommand(cmd);
+	lastDataIn = HpStm93cSendCommand(flashConf, cmd);
 	if (lastDataIn){
 		// error - on sending A0 address bit the Q must be 0, see Figure 2.7 of DS21795E-page 9
 		Error_Handler();
@@ -212,7 +213,7 @@ static uint32_t MyReadValue16(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
 
 	// WARNING! i must be signed to avoid infinity cycle
 	for(i=MY_DATA_BITS-1;i>=0;i--){
-		uint32_t bitVal = MyBitIn();
+		uint32_t bitVal = HpStm93cBitIn(flashConf);
 		if (bitVal){
 			val16 |=  ( 1 << i);
 		}
@@ -233,8 +234,8 @@ static void read_all_flash(hpstm_93c_conf_t *flashConf){
 	}
 
 	for(i=0,j=0;i<(int)n32;i++,j+=2){
-		uint32_t val1= MyReadValue16(flashConf, (uint32_t)j);
-		uint32_t val2= MyReadValue16(flashConf, (uint32_t)j+1);
+		uint32_t val1= HpStm93cReadValue16(flashConf, (uint32_t)j);
+		uint32_t val2= HpStm93cReadValue16(flashConf, (uint32_t)j+1);
 
 		data32[i] = (val2 & 0xffff) | ( (val1 & 0xffff) << 16);
 	}
