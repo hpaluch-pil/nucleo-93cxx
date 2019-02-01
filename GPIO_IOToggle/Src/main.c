@@ -56,6 +56,11 @@ static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
 
+
+static void MyDelay(uint32_t myDelay){
+	HAL_Delay(myDelay);
+}
+
 static void MyOutputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin, uint32_t active){
 	 GPIO_PinState st = active ? GPIO_PIN_SET : GPIO_PIN_RESET;
 	 HAL_GPIO_WritePin(myGPIO, myPin, st);
@@ -75,6 +80,8 @@ static void MyInitOutputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
 
 	  GPIO_InitStruct.Pin = myPin;
 	  HAL_GPIO_Init(myGPIO, &GPIO_InitStruct);
+	  // ensure that output is set to 0
+	  MyOutputValueGPIO(myGPIO,myPin,0);
 }
 
 static void MyInitInputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
@@ -87,6 +94,112 @@ static void MyInitInputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
 
 }
 
+static void MyEnableCS(){
+	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,1);
+}
+
+static void MyDisableCS(){
+	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,1);
+}
+
+static uint32_t MyBitOut(uint32_t bitVal){
+	  uint32_t inVal=0;
+
+ 	  // PF14 will be D of 93Cxx
+	  MyOutputValueGPIO(GPIOF, GPIO_PIN_14,bitVal);
+	  MyDelay(1);
+	  // toggle CLK on and off
+	  // PF13 will be CLK of 93Cxx
+	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,1);
+	  MyDelay(1);
+	  // sample Q output after CLK raise - it is sometime important...
+	  inVal = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
+	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,0);
+	  MyDelay(1);
+	  return inVal;
+}
+
+static uint32_t MyBitIn(void){
+	  uint32_t bitVal=0;
+
+	  // PF13 will be CLK of 93Cxx
+	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,1);
+	  MyDelay(1);
+	  bitVal = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
+	  // PF13 will be CLK of 93Cxx
+	  MyOutputValueGPIO(GPIOF, GPIO_PIN_13,0);
+	  MyDelay(1);
+	  return bitVal;
+}
+
+
+static const int MY_CMD_BITS = 11;
+static const int MY_DATA_BITS = 16;
+
+static const uint32_t MY_CMD_START = ( 1 << 10);
+// "initializer not constant" when used ( 0x2 << 8) | MY_CMD_START;
+static const uint32_t MY_CMD_READ  = ( 0x2 << 8) | (1 << 10);
+
+static const uint32_t MY_ADDR_MASK = 0xff;
+
+static uint32_t MySendCommand(uint32_t cmdVal){
+	int i=0;
+	uint32_t lastDataIn=0;
+
+	// WARNING! i must be signed to avoid infinity cycle
+	for(i=MY_CMD_BITS-1;i>=0;i--){
+		uint32_t bitVal = ( (cmdVal & (1 << i)) ? 1 : 0);
+		lastDataIn = MyBitOut(bitVal);
+	}
+	return lastDataIn;
+}
+
+
+static uint32_t MyReadValue16(uint32_t myAddr){
+	int i=0;
+	uint32_t lastDataIn=0;
+	uint32_t val16=0;
+	uint32_t cmd = (myAddr & MY_ADDR_MASK) | MY_CMD_READ;
+	MyEnableCS();
+
+	lastDataIn = MySendCommand(cmd);
+	if (lastDataIn){
+		// error - on sending A0 address bit the Q must be 0, see Figure 2.7 of DS21795E-page 9
+	}
+
+	// WARNING! i must be signed to avoid infinity cycle
+	for(i=MY_DATA_BITS-1;i>=0;i--){
+		uint32_t bitVal = MyBitIn();
+		if (bitVal){
+			val16 |=  ( 1 << i);
+		}
+	}
+
+	MyDisableCS();
+	return val16;
+}
+
+static uint8_t data8[512] = { 0 };
+static size_t n8 = sizeof(data8)/sizeof(uint8_t);
+static uint16_t data16[256] = { 0 };
+static size_t n16 = sizeof(data16)/sizeof(uint16_t);
+
+static void read_all_flash(void){
+	int i;
+
+	for(i=0;i<(int)n16;i++){
+		data16[i] = 0;
+		data8[2*i]= 0;
+		data8[2*i+1] = 0;
+	}
+
+	for(i=0;i<(int)n16;i++){
+		uint32_t val= MyReadValue16((uint32_t)i);
+		data16[i] = val;
+		data8[2*i+1] = val & 0xff;
+		data8[2*i] = (val >> 8) & 0xff;
+	}
+}
 
 
 /**
@@ -135,11 +248,15 @@ int main(void)
   MyInitInputGPIO(GPIOF, GPIO_PIN_15);
 
 
+
+  read_all_flash();
+
   /* -3- Toggle IO in an infinite loop */
   while (1)
   {
-    uint32_t val = 0;
 
+/*
+    uint32_t val = 0;
     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
     if ( i & 1){
         HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_13);
@@ -148,10 +265,10 @@ int main(void)
     // Copy input from PF15 to PF14
     val = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
     MyOutputValueGPIO(GPIOF,GPIO_PIN_14,val);
-
-    /* Insert delay 100 ms */
+*/
     HAL_Delay(100);
 	i++;
+
   }
 }
 
