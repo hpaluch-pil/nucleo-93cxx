@@ -119,6 +119,15 @@ static void HpStmInitInputGPIO(hpstm_port_def_t *portDef){
 
 }
 
+// Initializes all 93C86 ports
+// WARNING! GPIO clocks must be still enabled manually before calling this function
+static void HpStm93cInitPorts(hpstm_93c_conf_t *flashConf){
+	  HpStmInitOutputGPIO(&flashConf->csPort);
+	  HpStmInitOutputGPIO(&flashConf->clkPort);
+	  HpStmInitOutputGPIO(&flashConf->dPort);
+	  HpStmInitInputGPIO(&flashConf->qPort);
+}
+
 static void MyEnableCS(){
 	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,1);
 	  MyDelay(1);
@@ -264,24 +273,16 @@ int main(void)
 
   /* -1- Enable GPIO Clock (to be able to program the configuration registers) */
   __HAL_RCC_GPIOB_CLK_ENABLE(); // probably not needed because BSP_LED_Init();
-  __HAL_RCC_GPIOF_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE(); // need to do here - all other pins use GPIOF
 
   hpstm_93c_conf_t my93c86Conf = {
-		  .csPort  = { GPIOB, GPIO_PIN_0 },
-		  .clkPort = { GPIOF, GPIO_PIN_13},
-		  .dPort   = { GPIOF, GPIO_PIN_14},
-		  .qPort   = { GPIOF, GPIO_PIN_15}
+		  .csPort  = { GPIOB, GPIO_PIN_0 }, // PB0 wil be CS of 93Cxx
+		  .clkPort = { GPIOF, GPIO_PIN_13}, // PF13 will be CLK of 93Cxx
+		  .dPort   = { GPIOF, GPIO_PIN_14}, // PF14 will be D of 93Cxx
+		  .qPort   = { GPIOF, GPIO_PIN_15}  // PF14 will be D of 93Cxx
   };
 
-  // PB0 wil be CS of 93Cxx
-  HpStmInitOutputGPIO(&my93c86Conf.csPort);
-  // PF13 will be CLK of 93Cxx
-  HpStmInitOutputGPIO(&my93c86Conf.clkPort);
-  // PF14 will be D of 93Cxx
-  HpStmInitOutputGPIO(&my93c86Conf.dPort);
-  // PF15 this will be Q (input) from 93Cxxx
-  HpStmInitInputGPIO(&my93c86Conf.qPort);
-
+  HpStm93cInitPorts(&my93c86Conf);
 
   // Blue LED2 means = reading flash in progress...
   BSP_LED_On(LED2);
