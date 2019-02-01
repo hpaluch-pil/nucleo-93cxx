@@ -131,7 +131,7 @@ int main(void)
   MyInitOutputGPIO(GPIOF, GPIO_PIN_13);
   // PF14 will be D of 93Cxx
   MyInitOutputGPIO(GPIOF, GPIO_PIN_14);
-  // F15 this will be Q (input) from 93Cxxx
+  // PF15 this will be Q (input) from 93Cxxx
   MyInitInputGPIO(GPIOF, GPIO_PIN_15);
 
 
@@ -145,15 +145,9 @@ int main(void)
         HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_13);
     }
 
-#if 1
-    if ( (i & 3)==2 ){
-        HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_14);
-    }
-#else
-    // Copy input from F15 to F14
+    // Copy input from PF15 to PF14
     val = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
     MyOutputValueGPIO(GPIOF,GPIO_PIN_14,val);
-#endif
 
     /* Insert delay 100 ms */
     HAL_Delay(100);
