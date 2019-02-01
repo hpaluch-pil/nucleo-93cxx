@@ -55,6 +55,14 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
+static void Error_Handler(void)
+{
+  /* Turn "error" LED3 on and wait forever */
+  BSP_LED_On(LED3);
+  while (1)
+  {
+  }
+}
 
 
 static void MyDelay(uint32_t myDelay){
@@ -96,10 +104,12 @@ static void MyInitInputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
 
 static void MyEnableCS(){
 	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,1);
+	  MyDelay(1);
 }
 
 static void MyDisableCS(){
-	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,1);
+	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,0);
+	  MyDelay(1);
 }
 
 static uint32_t MyBitOut(uint32_t bitVal){
@@ -165,6 +175,7 @@ static uint32_t MyReadValue16(uint32_t myAddr){
 	lastDataIn = MySendCommand(cmd);
 	if (lastDataIn){
 		// error - on sending A0 address bit the Q must be 0, see Figure 2.7 of DS21795E-page 9
+		Error_Handler();
 	}
 
 	// WARNING! i must be signed to avoid infinity cycle
@@ -179,25 +190,27 @@ static uint32_t MyReadValue16(uint32_t myAddr){
 	return val16;
 }
 
-static uint8_t data8[512] = { 0 };
-static size_t n8 = sizeof(data8)/sizeof(uint8_t);
-static uint16_t data16[256] = { 0 };
-static size_t n16 = sizeof(data16)/sizeof(uint16_t);
+static uint32_t data32[128] = { 0 };
+static size_t n32 = sizeof(data32)/sizeof(uint32_t);
 
 static void read_all_flash(void){
-	int i;
+	int i,j;
 
-	for(i=0;i<(int)n16;i++){
-		data16[i] = 0;
-		data8[2*i]= 0;
-		data8[2*i+1] = 0;
+	for(i=0;i<(int)n32;i++){
+		data32[i] = 0;
 	}
 
-	for(i=0;i<(int)n16;i++){
-		uint32_t val= MyReadValue16((uint32_t)i);
-		data16[i] = val;
-		data8[2*i+1] = val & 0xff;
-		data8[2*i] = (val >> 8) & 0xff;
+	for(i=0,j=0;i<(int)n32;i++,j+=2){
+		uint32_t val1= MyReadValue16((uint32_t)j);
+		uint32_t val2= MyReadValue16((uint32_t)j+1);
+
+		uint32_t b1,b2,b3,b4;
+		b1 = val1 & 0xff;
+		b2 = (val1 >> 8) & 0xff;
+		b3 = val2 & 0xff;
+		b4 = (val2 >> 8) & 0xff;
+
+		data32[i] = (val2 & 0xffff) | ( (val1 & 0xffff) << 16);
 	}
 }
 
@@ -233,8 +246,13 @@ int main(void)
   /* Configure the system clock to 216 MHz */
   SystemClock_Config();
 
+  /* Initialize BSP Led for blue LED2 = GPIOB, PIN7*/
+  BSP_LED_Init(LED2);
+  /* Initialize BSP Led for red LED3 = GPIOB, PIN14*/
+  BSP_LED_Init(LED3);
+
   /* -1- Enable GPIO Clock (to be able to program the configuration registers) */
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE(); // probably not needed because BSP_LED_Init();
   __HAL_RCC_GPIOF_CLK_ENABLE();
 
 
@@ -248,8 +266,10 @@ int main(void)
   MyInitInputGPIO(GPIOF, GPIO_PIN_15);
 
 
-
+  // Blue LED2 means = reading flash in progress...
+  BSP_LED_On(LED2);
   read_all_flash();
+  BSP_LED_Off(LED2);
 
   /* -3- Toggle IO in an infinite loop */
   while (1)
@@ -347,6 +367,7 @@ static void CPU_CACHE_Enable(void)
   /* Enable D-Cache */
   SCB_EnableDCache();
 }
+
 
 #ifdef  USE_FULL_ASSERT
 
