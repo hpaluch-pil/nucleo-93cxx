@@ -97,6 +97,12 @@ static uint32_t MyInputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin)
 }
 
 
+static void HpStmOutputValueGPIO(hpstm_port_def_t *portDef, uint32_t active){
+	 GPIO_PinState st = active ? GPIO_PIN_SET : GPIO_PIN_RESET;
+	 HAL_GPIO_WritePin(portDef->addr, portDef->pin, st);
+}
+
+
 static void HpStmInitOutputGPIO(hpstm_port_def_t *portDef){
 	  /* -2- Configure IO in output push-pull mode to drive external LEDs */
 	  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
@@ -128,13 +134,13 @@ static void HpStm93cInitPorts(hpstm_93c_conf_t *flashConf){
 	  HpStmInitInputGPIO(&flashConf->qPort);
 }
 
-static void MyEnableCS(){
-	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,1);
+static void HpStm93cEnableCS(hpstm_93c_conf_t *flashConf){
+	  HpStmOutputValueGPIO(&flashConf->csPort,1);
 	  MyDelay(1);
 }
 
-static void MyDisableCS(){
-	  MyOutputValueGPIO(GPIOB, GPIO_PIN_0,0);
+static void HpStm93cDisableCS(hpstm_93c_conf_t *flashConf){
+	  HpStmOutputValueGPIO(&flashConf->csPort,0);
 	  MyDelay(1);
 }
 
@@ -191,12 +197,12 @@ static uint32_t MySendCommand(uint32_t cmdVal){
 }
 
 
-static uint32_t MyReadValue16(uint32_t myAddr){
+static uint32_t MyReadValue16(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
 	int i=0;
 	uint32_t lastDataIn=0;
 	uint32_t val16=0;
 	uint32_t cmd = (myAddr & MY_ADDR_MASK) | MY_CMD_READ;
-	MyEnableCS();
+	HpStm93cEnableCS(flashConf);
 
 	lastDataIn = MySendCommand(cmd);
 	if (lastDataIn){
@@ -212,14 +218,14 @@ static uint32_t MyReadValue16(uint32_t myAddr){
 		}
 	}
 
-	MyDisableCS();
+	HpStm93cDisableCS(flashConf);
 	return val16;
 }
 
 static uint32_t data32[128] = { 0 };
 static size_t n32 = sizeof(data32)/sizeof(uint32_t);
 
-static void read_all_flash(void){
+static void read_all_flash(hpstm_93c_conf_t *flashConf){
 	int i,j;
 
 	for(i=0;i<(int)n32;i++){
@@ -227,8 +233,8 @@ static void read_all_flash(void){
 	}
 
 	for(i=0,j=0;i<(int)n32;i++,j+=2){
-		uint32_t val1= MyReadValue16((uint32_t)j);
-		uint32_t val2= MyReadValue16((uint32_t)j+1);
+		uint32_t val1= MyReadValue16(flashConf, (uint32_t)j);
+		uint32_t val2= MyReadValue16(flashConf, (uint32_t)j+1);
 
 		data32[i] = (val2 & 0xffff) | ( (val1 & 0xffff) << 16);
 	}
@@ -286,7 +292,7 @@ int main(void)
 
   // Blue LED2 means = reading flash in progress...
   BSP_LED_On(LED2);
-  read_all_flash();
+  read_all_flash(&my93c86Conf);
   BSP_LED_Off(LED2);
 
   /* -3- Toggle IO in an infinite loop */
