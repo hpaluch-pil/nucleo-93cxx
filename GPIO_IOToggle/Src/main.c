@@ -2,8 +2,7 @@
   ******************************************************************************
   * @file    GPIO/GPIO_IOToggle/Src/main.c
   * @author  MCD Application Team
-  * @brief   This example describes how to configure and use GPIOs through
-  *          the STM32F7xx HAL API.
+  * @brief   currently it toggles LEDs on PB0, PF13 and PF14 at different speed
   ******************************************************************************
   * @attention
   *
@@ -57,6 +56,39 @@ static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
 
+static void MyOutputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin, uint32_t active){
+	 GPIO_PinState st = active ? GPIO_PIN_SET : GPIO_PIN_RESET;
+	 HAL_GPIO_WritePin(myGPIO, myPin, st);
+}
+
+static uint32_t MyInputValueGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin)
+{
+  return HAL_GPIO_ReadPin(myGPIO, myPin);
+}
+
+
+static void MyInitOutputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
+	  /* -2- Configure IO in output push-pull mode to drive external LEDs */
+	  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
+	  GPIO_InitStruct.Pull  = GPIO_NOPULL; // GPIO_PULLUP;
+	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+
+	  GPIO_InitStruct.Pin = myPin;
+	  HAL_GPIO_Init(myGPIO, &GPIO_InitStruct);
+}
+
+static void MyInitInputGPIO(GPIO_TypeDef  *myGPIO, uint32_t myPin){
+	// from stm32f7xx_nucleo_144.c
+    GPIO_InitStruct.Pin = myPin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull =  GPIO_PULLUP; //  GPIO_PULLDOWN;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    HAL_GPIO_Init(myGPIO, &GPIO_InitStruct);
+
+}
+
+
+
 /**
   * @brief  Main program
   * @param  None
@@ -64,6 +96,7 @@ static void CPU_CACHE_Enable(void);
   */
 int main(void)
 {
+	uint32_t i=0;
   /* This sample code shows how to use GPIO HAL API to toggle GPIOB-GPIO_PIN_0 IO
     in an infinite loop. It is possible to connect a LED between GPIOB-GPIO_PIN_0
     output and ground via a 330ohm resistor to see this external LED blink.
@@ -89,21 +122,42 @@ int main(void)
 
   /* -1- Enable GPIO Clock (to be able to program the configuration registers) */
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
 
-  /* -2- Configure IO in output push-pull mode to drive external LEDs */
-  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull  = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  // PB0 wil be CS of 93Cxx
+  MyInitOutputGPIO(GPIOB, GPIO_PIN_0);
+  // PF13 will be CLK of 93Cxx
+  MyInitOutputGPIO(GPIOF, GPIO_PIN_13);
+  // PF14 will be D of 93Cxx
+  MyInitOutputGPIO(GPIOF, GPIO_PIN_14);
+  // F15 this will be Q (input) from 93Cxxx
+  MyInitInputGPIO(GPIOF, GPIO_PIN_15);
+
 
   /* -3- Toggle IO in an infinite loop */
   while (1)
   {
+    uint32_t val = 0;
+
     HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+    if ( i & 1){
+        HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_13);
+    }
+
+#if 1
+    if ( (i & 3)==2 ){
+        HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_14);
+    }
+#else
+    // Copy input from F15 to F14
+    val = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
+    MyOutputValueGPIO(GPIOF,GPIO_PIN_14,val);
+#endif
+
     /* Insert delay 100 ms */
     HAL_Delay(100);
+	i++;
   }
 }
 
