@@ -23,9 +23,11 @@ STM32Cube_FW_F7_V1.14.0\Projects\STM32F767ZI-Nucleo\Examples\GPIO\GPIO_IOToggle\
 For development you need to download and
 extract `en.stm32cubef7.zip` from [STM32CubeF7]:
 
-## Connecting 93LC66C to Nucleo
+## Connecting 93LC66C and 94LC86 to Nucleo
 
-Here is table how [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
+Currently we are connecting to EEPROMs for debug purposes.
+
+Here is table how the 1st [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
 
 |Nucleo Conn.|Nucleo PIN|Nucleo Func|93LC66C PIN|
 |------------|----------|-----------|-----------|
@@ -42,13 +44,23 @@ Here is table how [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
     input (no need to worry about CS signal load).
     See [STM32 Nucleo-144 boards], `Figure 20. Extension connectors` for details.
 
+Here are additional connections for the 2nd EEPROM [93LC86]:
+
+|Nucleo Conn.|Nucleo PIN|Nucleo Func|93LC86 PIN|
+|------------|----------|-----------|----------|
+|CN10|24|PE10|1 CS|
+|CN10|26|PE12|2 CLK|
+|CN10|28|PE14|3 D (input)|
+|CN10|30|PE15|4 Q (output)|
+
 Current schematic is (made in ExpressSCH 6.1.4  - part of ExpressPCB freeware):
 
-![STM NUCLEO-F767ZI with 93LCxx EEPROM](https://github.com/hpaluch-pil/nucleo-93cxx/blob/master/ExpressPCB/nucleo-w-93lc.png?raw=true)
+![STM NUCLEO-F767ZI with 93LCxx EEPROMs](https://github.com/hpaluch-pil/nucleo-93cxx/blob/master/ExpressPCB/nucleo-w-93lc.png?raw=true)
 
 
 [93LC66C]: https://www.microchip.com/wwwproducts/en/93LC66C
 [93LC66C PDF]: http://ww1.microchip.com/downloads/en/DeviceDoc/21795E.pdf
+[93LC86]: https://www.microchip.com/wwwproducts/en/93LC86
 [STM NUCLEO-F767ZI]: https://www.st.com/content/st_com/en/products/evaluation-tools/product-evaluation-tools/mcu-eval-tools/stm32-mcu-eval-tools/stm32-mcu-nucleo/nucleo-f767zi.html
 [Getting started with ST NUCLEO F767ZI Board]: https://github.com/hpaluch/hpaluch.github.io/wiki/Getting-started-with-ST-NUCLEO-F767ZI-Board
 [STM32CubeF7]: https://www.st.com/en/embedded-software/stm32cubef7.html

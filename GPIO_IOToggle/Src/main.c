@@ -74,6 +74,8 @@ typedef struct {
 
 /* Private define ------------------------------------------------------------*/
 #define HPSTM_93C66_NBYTES (512)
+#define HPSTM_93LC86_NBYTES (2048)
+
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 static GPIO_InitTypeDef  GPIO_InitStruct;
@@ -269,7 +271,7 @@ static void HpStm93cReadData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, ui
 static uint8_t data8[HPSTM_93C66_NBYTES] = { 0 };
 static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
 
-static void read_all_flash(hpstm_93c_conf_t *flashConf){
+static void read_all_flash1(hpstm_93c_conf_t *flashConf){
 
 	// check for mis-configuration/overflows...
 	if (flashConf->nBytes != n8){
@@ -280,6 +282,22 @@ static void read_all_flash(hpstm_93c_conf_t *flashConf){
 
 	HpStm93cReadData(flashConf,0,data8,n8);
 }
+
+static uint8_t data2_8[HPSTM_93LC86_NBYTES] = { 0 };
+static int n2_8 = (int)sizeof(data2_8)/sizeof(uint8_t);
+
+static void read_all_flash2(hpstm_93c_conf_t *flashConf){
+
+	// check for mis-configuration/overflows...
+	if (flashConf->nBytes != n2_8){
+		Error_Handler();
+	}
+
+	memset(data2_8,0,n2_8); // just to be sure
+
+	HpStm93cReadData(flashConf,0,data2_8,n2_8);
+}
+
 
 
 /**
@@ -315,13 +333,14 @@ int main(void)
 
   /* -1- Enable GPIO Clock (to be able to program the configuration registers) */
   __HAL_RCC_GPIOB_CLK_ENABLE(); // probably not needed because BSP_LED_Init();
-  __HAL_RCC_GPIOF_CLK_ENABLE(); // need to do here - all other pins use GPIOF
+  __HAL_RCC_GPIOE_CLK_ENABLE(); // GPIO pins for 2nd EEPROM - 93LC86
+  __HAL_RCC_GPIOF_CLK_ENABLE(); // most GPIO pins for 1st EEPROM 93LC66B/C
 
   hpstm_93c_conf_t my93lc66Conf = {
 		  .csPort   = { GPIOB, GPIO_PIN_0 }, // PB0 wil be CS of 93Cxx
 		  .clkPort  = { GPIOF, GPIO_PIN_13}, // PF13 will be CLK of 93Cxx
 		  .dPort    = { GPIOF, GPIO_PIN_14}, // PF14 will be D of 93Cxx
-		  .qPort    = { GPIOF, GPIO_PIN_15},  // PF14 will be D of 93Cxx
+		  .qPort    = { GPIOF, GPIO_PIN_15}, // PF15 will be Q of 93Cxx
 		  .org      = HPSTM_93C_ORG16,
 		  .addrBits = 8,
 		  .nBytes   = HPSTM_93C66_NBYTES
@@ -329,10 +348,28 @@ int main(void)
 
   HpStm93cInitPorts(&my93lc66Conf);
 
+  hpstm_93c_conf_t my93lc86Conf = {
+		  .csPort   = { GPIOE, GPIO_PIN_10 }, // PE10 wil be CS of 93LC86
+		  .clkPort  = { GPIOE, GPIO_PIN_12},  // PE12 will be CLK of 93LC86
+		  .dPort    = { GPIOE, GPIO_PIN_14},  // PE14 will be D of 93LC86
+		  .qPort    = { GPIOE, GPIO_PIN_15},  // PE15 will be Q of 93LC86
+		  .org      = HPSTM_93C_ORG16,
+		  .addrBits = 10,
+		  .nBytes   = HPSTM_93LC86_NBYTES
+  };
+
+  HpStm93cInitPorts(&my93lc86Conf);
+
+
   // Blue LED2 means = reading EEPROM in progress...
   BSP_LED_On(LED2);
-  read_all_flash(&my93lc66Conf);
+  read_all_flash1(&my93lc66Conf);
   BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED2);
+  read_all_flash2(&my93lc86Conf);
+  BSP_LED_Off(LED2);
+
 
   while (1)
   {
