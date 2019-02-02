@@ -89,9 +89,20 @@ static void Error_Handler(void)
   }
 }
 
+static void HpStmUDelay(uint32_t usDelay){
+	// grabbed from: https://github.com/micropython/micropython/blob/master/ports/stm32/systick.c
+	// WARNING! I don't understand it :-)
+
+    // IRQs disabled, so need to use a busy loop for the delay
+    // sys freq is always a multiple of 2MHz, so division here won't lose precision
+    const uint32_t ucount = HAL_RCC_GetSysClockFreq() / 2000000 * usDelay / 2;
+    for (uint32_t count = 0; ++count <= ucount;) {
+    }
+}
 
 static void MyDelay(uint32_t myDelay){
-	HAL_Delay(myDelay);
+	HpStmUDelay(10*myDelay); // wait at least 10uS - should be safe everytime...
+	//	HAL_Delay(myDelay);
 }
 
 static uint32_t HpStmInputValueGPIO(hpstm_port_def_t *portDef)
