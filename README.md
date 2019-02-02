@@ -6,7 +6,7 @@ of [93C86] serial flash into RAM of
 Please read my [Getting started with ST NUCLEO F767ZI Board]
 for development setup instructions.
 
-Known bugs limitations:
+Known bugs and limitations:
 * Usable in debugger only (it reads data from flash to array and loops forever)
 * only 16-bit flash data organization is currently supported.
 
@@ -30,15 +30,15 @@ Here is table how [93C86] should be connected to [STM NUCLEO-F767ZI]:
 |------------|----------|-----------|---------|
 |CN8|7|+3V3|8 Vcc|
 |CN8|11|GND|5 GND (Vss)|
-|CN10|31|PB0^1|1 CS|
+|CN10|31|PB0 <sup>1</sup>|1 CS|
 |CN10|2|PF13|2 CLK|
 |CN10|8|PF14|3 D (input)|
 |CN10|12|PF15|4 Q (output)|
 
 -----
-1) The PB0 is also connected to green LED LD1.
-   But it is OK because there is Operational Amplifier on PB0 with high impedance
-   (no need to worry about CS signal load).
+ 1) The PB0 is also connected to green LED LD1.
+    But it is OK because there is Operational Amplifier on PB0 with high impedance
+    (no need to worry about CS signal load).
 
 
 [93C86]: https://www.microchip.com/wwwproducts/en/93C86
