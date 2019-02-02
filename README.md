@@ -42,6 +42,10 @@ Here is table how [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
     input (no need to worry about CS signal load).
     See [STM32 Nucleo-144 boards], `Figure 20. Extension connectors` for details.
 
+Current schematic is (made in ExpressSCH 6.1.4  - part of ExpressPCB freeware):
+
+![STM NUCLEO-F767ZI with 93LCxx EEPROM](https://github.com/hpaluch-pil/nucleo-93cxx/blob/master/ExpressPCB/nucleo-w-93lc.png?raw=true)
+
 
 [93LC66C]: https://www.microchip.com/wwwproducts/en/93LC66C
 [93LC66C PDF]: http://ww1.microchip.com/downloads/en/DeviceDoc/21795E.pdf

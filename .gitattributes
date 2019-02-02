@@ -1,0 +1,8 @@
+# ExpressPCB library
+*.s binary
+# ExpressPCB schematics
+*.sch binary
+
+# should be default
+*.png binary
+
