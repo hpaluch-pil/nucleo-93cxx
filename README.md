@@ -1,7 +1,7 @@
 # How to read flash 93LC66C to memory
 
 Here is an attempt how to read contents
-of [93LC66C] serial flash (see also 93LC66C PDF]) into RAM of
+of [93LC66C] serial flash (see also [93LC66C PDF]) into RAM of
 [STM NUCLEO-F767ZI] development board.
 Please read my [Getting started with ST NUCLEO F767ZI Board]
 for development setup instructions.
