@@ -301,6 +301,7 @@ static void HpStm93cWaitAfterWrite(hpstm_93c_conf_t *flashConf){
     HpStm93cBitIn(flashConf); // do rather 1 fake clock
 
     for(i=0;i<WRITE_TIMEOUT_MS;i++){
+    	HAL_Delay(1); // wait 1ms after write
     	uint32_t val = HpStm93cBitIn(flashConf);
     	if (val){
     		return;
@@ -327,10 +328,14 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 	// EWEN - write enable
 	HpStm93cEwEn(flashConf);
 
+	HpStm93cDisableCS(flashConf);
+
+
 	if ( nDataBits == 16){
 		// 16-bit data
 		for(j=0;j<nBytes/2;j+=2){
 			uint32_t val = (inBuf[j+1] & 0xff) | ((inBuf[j]<<8) & 0xff00);
+			HpStm93cEnableCS(flashConf);
 			// initiate write command
 			HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j/2);
 			// write dataBits
@@ -340,11 +345,13 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 			}
 			// there is need to wait after write (around 3ms according to data sheet)
 			HpStm93cWaitAfterWrite(flashConf);
+			HpStm93cDisableCS(flashConf);
 		}
 	} else {
 		// 8-bit data
 		for(j=0;j<nBytes;j++){
 			uint32_t val = inBuf[j];
+			HpStm93cEnableCS(flashConf);
 			// initiate write command
 			HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j);
 			// write dataBits
@@ -354,9 +361,11 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 			}
 			// there is need to wait after write (around 3ms according to data sheet)
 			HpStm93cWaitAfterWrite(flashConf);
+			HpStm93cDisableCS(flashConf);
 		}
 	}
 
+	HpStm93cEnableCS(flashConf);
 	// EWDS - write disable
 	HpStm93cEwDs(flashConf);
 
