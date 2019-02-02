@@ -331,38 +331,31 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 	HpStm93cDisableCS(flashConf);
 
 
-	if ( nDataBits == 16){
-		// 16-bit data
-		for(j=0;j<nBytes/2;j+=2){
-			uint32_t val = (inBuf[j+1] & 0xff) | ((inBuf[j]<<8) & 0xff00);
-			HpStm93cEnableCS(flashConf);
-			// initiate write command
-			HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j/2);
-			// write dataBits
-			for(i=0; i<nDataBits; i++){
-				uint32_t myBit = val & ( 1 << (nDataBits-i-1));
-				HpStm93cBitOut(flashConf,myBit);
+	uint32_t val = 0;
+	for(j=0;j<nBytes;j++){
+		if (nDataBits == 16){
+			// 16-bit data - mess...
+			if ( (j&1)==0){
+				val = ((inBuf[j]<<8) & 0xff00);
+				continue;
 			}
-			// there is need to wait after write (around 3ms according to data sheet)
-			HpStm93cWaitAfterWrite(flashConf);
-			HpStm93cDisableCS(flashConf);
+			val |= inBuf[j] & 0xff;
+		} else {
+			// 8-bit data are easy :-)
+			val = inBuf[j] & 0xff;
 		}
-	} else {
-		// 8-bit data
-		for(j=0;j<nBytes;j++){
-			uint32_t val = inBuf[j];
-			HpStm93cEnableCS(flashConf);
-			// initiate write command
-			HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j);
-			// write dataBits
-			for(i=0; i<nDataBits; i++){
-				uint32_t myBit = val & ( 1 << (nDataBits-i-1));
-				HpStm93cBitOut(flashConf,myBit);
-			}
-			// there is need to wait after write (around 3ms according to data sheet)
-			HpStm93cWaitAfterWrite(flashConf);
-			HpStm93cDisableCS(flashConf);
+
+		HpStm93cEnableCS(flashConf);
+		// initiate write command
+		HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j/2);
+		// write dataBits
+		for(i=0; i<nDataBits; i++){
+			uint32_t myBit = val & ( 1 << (nDataBits-i-1));
+			HpStm93cBitOut(flashConf,myBit);
 		}
+		// there is need to wait after write (around 3ms according to data sheet)
+		HpStm93cWaitAfterWrite(flashConf);
+		HpStm93cDisableCS(flashConf);
 	}
 
 	HpStm93cEnableCS(flashConf);
