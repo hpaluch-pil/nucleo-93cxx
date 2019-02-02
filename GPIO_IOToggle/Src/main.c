@@ -66,6 +66,7 @@ typedef struct {
 	hpstm_port_def_t dPort;
 	hpstm_port_def_t qPort;
 	hpstm_93c_org_t  org;
+	int addrBits; // number of address bits in command - warning! depends also on ".org"!
 } hpstm_93c_conf_t;
 
 /* Private define ------------------------------------------------------------*/
@@ -182,53 +183,57 @@ static uint32_t HpStm93cBitIn(hpstm_93c_conf_t *flashConf){
 	  return bitVal;
 }
 
+// 93Cxx read command
+static const int HPSTM_93C_CMD_READ = 0x2;
+// all 93Cxx seems to have opcode length 2 bits;
+static const int HPSTM_93C_OPCODE_BITS = 2;
 
-static const int MY_CMD_BITS = 11;
-
-static const uint32_t MY_CMD_START = ( 1 << 10);
-// "initializer not constant" when used ( 0x2 << 8) | MY_CMD_START;
-static const uint32_t MY_CMD_READ  = ( 0x2 << 8) | (1 << 10);
-
-static const uint32_t MY_ADDR_MASK = 0xff;
-
-static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t cmdVal){
+static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t opCode, uint32_t addr){
 	int i=0;
 	uint32_t lastDataIn=0;
 
-	// WARNING! i must be signed to avoid infinity cycle
-	for(i=MY_CMD_BITS-1;i>=0;i--){
-		uint32_t bitVal = ( (cmdVal & (1 << i)) ? 1 : 0);
+	// all commands start with Start-Bit =1
+	HpStm93cBitOut(flashConf, 1);
+
+	// send command itself
+	for(i=0;i<HPSTM_93C_OPCODE_BITS;i++){
+		uint32_t bitVal =  opCode & ( 1U << (HPSTM_93C_OPCODE_BITS-i-1) );
+		HpStm93cBitOut(flashConf, bitVal);
+	}
+
+	// send address bits MSB first
+	for(i=0;i<flashConf->addrBits;i++){
+		uint32_t bitVal = addr & (1U << (flashConf->addrBits-i-1));
 		lastDataIn = HpStm93cBitOut(flashConf, bitVal);
 	}
 	return lastDataIn;
 }
 
-
 static uint32_t HpStm93cReadValue(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
 	int i=0;
 	uint32_t lastDataIn=0;
-	uint32_t val16=0;
-	uint32_t cmd = (myAddr & MY_ADDR_MASK) | MY_CMD_READ;
+	uint32_t val=0;
 	int nDataBits = flashConf->org == HPSTM_93C_ORG16 ? 16 : 8;
 
 	HpStm93cEnableCS(flashConf);
 
-	lastDataIn = HpStm93cSendCommand(flashConf, cmd);
+	lastDataIn = HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_READ,myAddr);
 	if (lastDataIn){
 		// error - on sending A0 address bit the Q must be 0, see Figure 2.7 of DS21795E-page 9
 		Error_Handler();
 	}
 
+	// read data bits - MSB is first
 	for(i=0; i<nDataBits; i++){
-		val16 <<=1;
+		val <<=1;
 		uint32_t bitVal = HpStm93cBitIn(flashConf);
 		if (bitVal){
-			val16 |=1;
+			val |=1;
 		}
 	}
 
 	HpStm93cDisableCS(flashConf);
-	return val16;
+	return val;
 }
 
 static uint32_t data32[128] = { 0 };
@@ -291,11 +296,12 @@ int main(void)
   __HAL_RCC_GPIOF_CLK_ENABLE(); // need to do here - all other pins use GPIOF
 
   hpstm_93c_conf_t my93lc66Conf = {
-		  .csPort  = { GPIOB, GPIO_PIN_0 }, // PB0 wil be CS of 93Cxx
-		  .clkPort = { GPIOF, GPIO_PIN_13}, // PF13 will be CLK of 93Cxx
-		  .dPort   = { GPIOF, GPIO_PIN_14}, // PF14 will be D of 93Cxx
-		  .qPort   = { GPIOF, GPIO_PIN_15},  // PF14 will be D of 93Cxx
-		  .org     = HPSTM_93C_ORG16
+		  .csPort   = { GPIOB, GPIO_PIN_0 }, // PB0 wil be CS of 93Cxx
+		  .clkPort  = { GPIOF, GPIO_PIN_13}, // PF13 will be CLK of 93Cxx
+		  .dPort    = { GPIOF, GPIO_PIN_14}, // PF14 will be D of 93Cxx
+		  .qPort    = { GPIOF, GPIO_PIN_15},  // PF14 will be D of 93Cxx
+		  .org      = HPSTM_93C_ORG16,
+		  .addrBits = 8
   };
 
   HpStm93cInitPorts(&my93lc66Conf);

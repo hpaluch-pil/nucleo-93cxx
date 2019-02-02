@@ -9,6 +9,8 @@ for development setup instructions.
 Known bugs and limitations:
 * Usable in debugger only (it reads data from flash to array and loops forever)
 * only 16-bit flash data organization is currently supported.
+* still uses 1ms delay (instead of 1us delay) - which is very slow.
+  Need to find clean way how to timer small delays.
 
 ## Source tree
 
