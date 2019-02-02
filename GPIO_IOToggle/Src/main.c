@@ -37,6 +37,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+// memset(3)
+#include<string.h>
 /** @addtogroup STM32F7xx_HAL_Examples
   * @{
   */
@@ -67,9 +69,11 @@ typedef struct {
 	hpstm_port_def_t qPort;
 	hpstm_93c_org_t  org;
 	int addrBits; // number of address bits in command - warning! depends also on ".org"!
+	int nBytes;   // number of total BYTES in EEPROM
 } hpstm_93c_conf_t;
 
 /* Private define ------------------------------------------------------------*/
+#define HPSTM_93C66_NBYTES (512)
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 static GPIO_InitTypeDef  GPIO_InitStruct;
@@ -91,7 +95,9 @@ static void Error_Handler(void)
 
 static void HpStmUDelay(uint32_t usDelay){
 	// grabbed from: https://github.com/micropython/micropython/blob/master/ports/stm32/systick.c
-	// WARNING! I don't understand it :-)
+	// MIT license
+
+	// WARNING! I don't understand this code :-)
 
     // IRQs disabled, so need to use a busy loop for the delay
     // sys freq is always a multiple of 2MHz, so division here won't lose precision
@@ -218,49 +224,61 @@ static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t opCode
 	return lastDataIn;
 }
 
-static uint32_t HpStm93cReadValue(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
-	int i=0;
+static void HpStm93cReadData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, uint8_t *outBuf, int nBytes){
+	int i=0,j=0;
 	uint32_t lastDataIn=0;
 	uint32_t val=0;
 	int nDataBits = flashConf->org == HPSTM_93C_ORG16 ? 16 : 8;
 
+	if ( (startAddr+nBytes) > flashConf->nBytes){
+		// some misc-configuration etc...
+		Error_Handler();
+	}
+
 	HpStm93cEnableCS(flashConf);
 
-	lastDataIn = HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_READ,myAddr);
+	lastDataIn = HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_READ,startAddr);
 	if (lastDataIn){
 		// error - on sending A0 address bit the Q must be 0, see Figure 2.7 of DS21795E-page 9
 		Error_Handler();
 	}
 
-	// read data bits - MSB is first
-	for(i=0; i<nDataBits; i++){
-		val <<=1;
-		uint32_t bitVal = HpStm93cBitIn(flashConf);
-		if (bitVal){
-			val |=1;
+	for(j=0,val=0; j<nBytes; j++){
+		if ( nDataBits != 16 || (j&1)==0){
+			// read data bits - MSB is first
+			for(i=0; i<nDataBits; i++){
+				val <<=1;
+				uint32_t bitVal = HpStm93cBitIn(flashConf);
+				if (bitVal){
+					val |=1;
+				}
+			}
+			if (nDataBits == 16){
+				outBuf[j] = (val >> 8) & 0xff;
+			} else {
+				outBuf[j] = val & 0xff;
+			}
+		} else {
+			outBuf[j] = val & 0xff;
 		}
 	}
 
 	HpStm93cDisableCS(flashConf);
-	return val;
 }
 
-static uint32_t data32[128] = { 0 };
-static size_t n32 = sizeof(data32)/sizeof(uint32_t);
+static uint8_t data8[HPSTM_93C66_NBYTES] = { 0 };
+static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
 
 static void read_all_flash(hpstm_93c_conf_t *flashConf){
-	int i,j;
 
-	for(i=0;i<(int)n32;i++){
-		data32[i] = 0;
+	// check for mis-configuration/overflows...
+	if (flashConf->nBytes != n8){
+		Error_Handler();
 	}
 
-	for(i=0,j=0;i<(int)n32;i++,j+=2){
-		uint32_t val1= HpStm93cReadValue(flashConf, (uint32_t)j);
-		uint32_t val2= HpStm93cReadValue(flashConf, (uint32_t)j+1);
+	memset(data8,0,n8); // just to be sure
 
-		data32[i] = (val2 & 0xffff) | ( (val1 & 0xffff) << 16);
-	}
+	HpStm93cReadData(flashConf,0,data8,n8);
 }
 
 
@@ -305,7 +323,8 @@ int main(void)
 		  .dPort    = { GPIOF, GPIO_PIN_14}, // PF14 will be D of 93Cxx
 		  .qPort    = { GPIOF, GPIO_PIN_15},  // PF14 will be D of 93Cxx
 		  .org      = HPSTM_93C_ORG16,
-		  .addrBits = 8
+		  .addrBits = 8,
+		  .nBytes   = HPSTM_93C66_NBYTES
   };
 
   HpStm93cInitPorts(&my93lc66Conf);
