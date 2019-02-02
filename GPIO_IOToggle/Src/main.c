@@ -201,7 +201,11 @@ static uint32_t HpStm93cBitIn(hpstm_93c_conf_t *flashConf){
 }
 
 // 93Cxx read command
-static const int HPSTM_93C_CMD_READ = 0x2;
+static const int HPSTM_93C_CMD_READ  = 0x2;
+static const int HPSTM_93C_CMD_WRITE = 0x1;
+static const int HPSTM_93C_CMD_EWEN  = 0x00;
+static const int HPSTM_93C_CMD_EWDS  = 0x00; // distinguished by special address
+
 // all 93Cxx seems to have opcode length 2 bits;
 static const int HPSTM_93C_OPCODE_BITS = 2;
 
@@ -226,6 +230,26 @@ static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t opCode
 	return lastDataIn;
 }
 
+// EWEN command use special "address"
+static const uint32_t HPSTM_93C_EWEN_ADDR = 0x3;
+
+// sends EWEN - Erase Write Enable command
+static void HpStm93cEwEn(hpstm_93c_conf_t *flashConf){
+
+	// there is special "address" for write enable
+	uint32_t ewEnAddr = ( HPSTM_93C_EWEN_ADDR << (flashConf->addrBits - 2) );
+	HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_EWEN,ewEnAddr);
+	// EEPROM provides no feedback on status
+}
+
+// sends EWEN - Erase Write Disable command
+static void HpStm93cEwDs(hpstm_93c_conf_t *flashConf){
+	// there is special "address" for write disable
+	HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_EWDS,0);
+	// EEPROM provides no feedback on status
+}
+
+
 static void HpStm93cReadData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, uint8_t *outBuf, int nBytes){
 	int i=0,j=0;
 	uint32_t lastDataIn=0;
@@ -233,7 +257,7 @@ static void HpStm93cReadData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, ui
 	int nDataBits = flashConf->org == HPSTM_93C_ORG16 ? 16 : 8;
 
 	if ( (startAddr+nBytes) > flashConf->nBytes){
-		// some misc-configuration etc...
+		// some mis-configuration etc...
 		Error_Handler();
 	}
 
@@ -268,6 +292,79 @@ static void HpStm93cReadData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, ui
 	HpStm93cDisableCS(flashConf);
 }
 
+static void HpStm93cWaitAfterWrite(hpstm_93c_conf_t *flashConf){
+	int i=0;
+	const int WRITE_TIMEOUT_MS = 10;
+
+
+	HAL_Delay(1); // wait 1ms after write
+    HpStm93cBitIn(flashConf); // do rather 1 fake clock
+
+    for(i=0;i<WRITE_TIMEOUT_MS;i++){
+    	uint32_t val = HpStm93cBitIn(flashConf);
+    	if (val){
+    		return;
+    	}
+    }
+
+    // oops, timeout....
+    Error_Handler();
+
+}
+
+static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, uint8_t *inBuf, int nBytes){
+	int i=0,j=0;
+	int nDataBits = flashConf->org == HPSTM_93C_ORG16 ? 16 : 8;
+
+	if ( (startAddr+nBytes) > flashConf->nBytes){
+		// some mis-configuration etc...
+		Error_Handler();
+	}
+
+	// CS enable
+	HpStm93cEnableCS(flashConf);
+
+	// EWEN - write enable
+	HpStm93cEwEn(flashConf);
+
+	if ( nDataBits == 16){
+		// 16-bit data
+		for(j=0;j<nBytes/2;j+=2){
+			uint32_t val = (inBuf[j+1] & 0xff) | ((inBuf[j]<<8) & 0xff00);
+			// initiate write command
+			HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j/2);
+			// write dataBits
+			for(i=0; i<nDataBits; i++){
+				uint32_t myBit = val & ( 1 << (nDataBits-i-1));
+				HpStm93cBitOut(flashConf,myBit);
+			}
+			// there is need to wait after write (around 3ms according to data sheet)
+			HpStm93cWaitAfterWrite(flashConf);
+		}
+	} else {
+		// 8-bit data
+		for(j=0;j<nBytes;j++){
+			uint32_t val = inBuf[j];
+			// initiate write command
+			HpStm93cSendCommand(flashConf,HPSTM_93C_CMD_WRITE,startAddr+j);
+			// write dataBits
+			for(i=0; i<nDataBits; i++){
+				uint32_t myBit = val & ( 1 << (nDataBits-i-1));
+				HpStm93cBitOut(flashConf,myBit);
+			}
+			// there is need to wait after write (around 3ms according to data sheet)
+			HpStm93cWaitAfterWrite(flashConf);
+		}
+	}
+
+	// EWDS - write disable
+	HpStm93cEwDs(flashConf);
+
+	// CS disable
+	HpStm93cDisableCS(flashConf);
+
+}
+
 static uint8_t data8[HPSTM_93C66_NBYTES] = { 0 };
 static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
 
@@ -281,6 +378,15 @@ static void read_all_flash1(hpstm_93c_conf_t *flashConf){
 	memset(data8,0,n8); // just to be sure
 
 	HpStm93cReadData(flashConf,0,data8,n8);
+}
+
+static void test_write_flash2(hpstm_93c_conf_t *flashConf){
+
+	static uint8_t test_data[4] = { 0x12, 0x34, 0x56, 0x78 };
+	static int n = (int)sizeof(test_data)/sizeof(uint8_t);
+
+	HpStm93cWriteData(flashConf,0,test_data,n);
+
 }
 
 static uint8_t data2_8[HPSTM_93LC86_NBYTES] = { 0 };
@@ -365,6 +471,11 @@ int main(void)
   BSP_LED_On(LED2);
   read_all_flash1(&my93lc66Conf);
   BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED2);
+  test_write_flash2(&my93lc86Conf);
+  BSP_LED_Off(LED2);
+
 
   BSP_LED_On(LED2);
   read_all_flash2(&my93lc86Conf);
