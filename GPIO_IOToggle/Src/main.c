@@ -3,7 +3,7 @@
   * @file    GPIO/GPIO_IOToggle/Src/main.c
   * @author  modified by Henryk Paluch of Pickering Interfaces, Ltd.
   * @author  MCD Application Team
-  * @brief   currently it toggles LEDs on PB0, PF13 and PF14 at different speed
+  * @brief   reads content of 93LC66C 16-bit org into RAM
   ******************************************************************************
   * @attention
   *
@@ -53,12 +53,19 @@ typedef struct {
 	uint32_t pin;
 } hpstm_port_def_t;
 
+// types of 93cxx data organizations
+typedef enum {
+	HPSTM_93C_ORG16, // 16-bit data, ORG=1 (for chips ending with 'C') or always (for chips ending with 'B')
+	HPSTM_93C_ORG8   // 8-bit data,  ORG=0 (for chips ending with 'C') or always (for chips ending with 'A')
+} hpstm_93c_org_t;
+
 // complete port (etc) configuration for specific 93c86 FLASH
 typedef struct {
 	hpstm_port_def_t csPort;
 	hpstm_port_def_t clkPort;
 	hpstm_port_def_t dPort;
 	hpstm_port_def_t qPort;
+	hpstm_93c_org_t  org;
 } hpstm_93c_conf_t;
 
 /* Private define ------------------------------------------------------------*/
@@ -119,7 +126,7 @@ static void HpStmInitInputGPIO(hpstm_port_def_t *portDef){
 
 }
 
-// Initializes all 93C86 ports
+// Initializes all 93LC66 ports
 // WARNING! GPIO clocks must be still enabled manually before calling this function
 static void HpStm93cInitPorts(hpstm_93c_conf_t *flashConf){
 	  HpStmInitOutputGPIO(&flashConf->csPort);
@@ -177,7 +184,6 @@ static uint32_t HpStm93cBitIn(hpstm_93c_conf_t *flashConf){
 
 
 static const int MY_CMD_BITS = 11;
-static const int MY_DATA_BITS = 16;
 
 static const uint32_t MY_CMD_START = ( 1 << 10);
 // "initializer not constant" when used ( 0x2 << 8) | MY_CMD_START;
@@ -198,11 +204,13 @@ static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t cmdVal
 }
 
 
-static uint32_t HpStm93cReadValue16(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
+static uint32_t HpStm93cReadValue(hpstm_93c_conf_t *flashConf, uint32_t myAddr){
 	int i=0;
 	uint32_t lastDataIn=0;
 	uint32_t val16=0;
 	uint32_t cmd = (myAddr & MY_ADDR_MASK) | MY_CMD_READ;
+	int nDataBits = flashConf->org == HPSTM_93C_ORG16 ? 16 : 8;
+
 	HpStm93cEnableCS(flashConf);
 
 	lastDataIn = HpStm93cSendCommand(flashConf, cmd);
@@ -211,11 +219,11 @@ static uint32_t HpStm93cReadValue16(hpstm_93c_conf_t *flashConf, uint32_t myAddr
 		Error_Handler();
 	}
 
-	// WARNING! i must be signed to avoid infinity cycle
-	for(i=MY_DATA_BITS-1;i>=0;i--){
+	for(i=0; i<nDataBits; i++){
+		val16 <<=1;
 		uint32_t bitVal = HpStm93cBitIn(flashConf);
 		if (bitVal){
-			val16 |=  ( 1 << i);
+			val16 |=1;
 		}
 	}
 
@@ -234,8 +242,8 @@ static void read_all_flash(hpstm_93c_conf_t *flashConf){
 	}
 
 	for(i=0,j=0;i<(int)n32;i++,j+=2){
-		uint32_t val1= HpStm93cReadValue16(flashConf, (uint32_t)j);
-		uint32_t val2= HpStm93cReadValue16(flashConf, (uint32_t)j+1);
+		uint32_t val1= HpStm93cReadValue(flashConf, (uint32_t)j);
+		uint32_t val2= HpStm93cReadValue(flashConf, (uint32_t)j+1);
 
 		data32[i] = (val2 & 0xffff) | ( (val1 & 0xffff) << 16);
 	}
@@ -282,18 +290,19 @@ int main(void)
   __HAL_RCC_GPIOB_CLK_ENABLE(); // probably not needed because BSP_LED_Init();
   __HAL_RCC_GPIOF_CLK_ENABLE(); // need to do here - all other pins use GPIOF
 
-  hpstm_93c_conf_t my93c86Conf = {
+  hpstm_93c_conf_t my93lc66Conf = {
 		  .csPort  = { GPIOB, GPIO_PIN_0 }, // PB0 wil be CS of 93Cxx
 		  .clkPort = { GPIOF, GPIO_PIN_13}, // PF13 will be CLK of 93Cxx
 		  .dPort   = { GPIOF, GPIO_PIN_14}, // PF14 will be D of 93Cxx
-		  .qPort   = { GPIOF, GPIO_PIN_15}  // PF14 will be D of 93Cxx
+		  .qPort   = { GPIOF, GPIO_PIN_15},  // PF14 will be D of 93Cxx
+		  .org     = HPSTM_93C_ORG16
   };
 
-  HpStm93cInitPorts(&my93c86Conf);
+  HpStm93cInitPorts(&my93lc66Conf);
 
   // Blue LED2 means = reading flash in progress...
   BSP_LED_On(LED2);
-  read_all_flash(&my93c86Conf);
+  read_all_flash(&my93lc66Conf);
   BSP_LED_Off(LED2);
 
   /* -3- Toggle IO in an infinite loop */

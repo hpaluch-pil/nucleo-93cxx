@@ -1,7 +1,7 @@
-# How to read flash 93C86 to memory
+# How to read flash 93LC66C to memory
 
 Here is an attempt how to read contents
-of [93C86] serial flash into RAM of
+of [93LC66C] serial flash (see also 93LC66C PDF]) into RAM of
 [STM NUCLEO-F767ZI] development board.
 Please read my [Getting started with ST NUCLEO F767ZI Board]
 for development setup instructions.
@@ -22,12 +22,12 @@ STM32Cube_FW_F7_V1.14.0\Projects\STM32F767ZI-Nucleo\Examples\GPIO\GPIO_IOToggle\
 For development you need to download and
 extract `en.stm32cubef7.zip` from [STM32CubeF7]:
 
-## Connecting  93C86 to Nucleo
+## Connecting 93LC66C to Nucleo
 
-Here is table how [93C86] should be connected to [STM NUCLEO-F767ZI]:
+Here is table how [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
 
-|Nucleo Conn.|Nucleo PIN|Nucleo Func|93C86 PIN|
-|------------|----------|-----------|---------|
+|Nucleo Conn.|Nucleo PIN|Nucleo Func|93LC66C PIN|
+|------------|----------|-----------|-----------|
 |CN8|7|+3V3|8 Vcc|
 |CN8|11|GND|5 GND (Vss)|
 |CN10|31|PB0 <sup>1</sup>|1 CS|
@@ -42,7 +42,8 @@ Here is table how [93C86] should be connected to [STM NUCLEO-F767ZI]:
     See [STM32 Nucleo-144 boards], `Figure 20. Extension connectors` for details.
 
 
-[93C86]: https://www.microchip.com/wwwproducts/en/93C86
+[93LC66C]: https://www.microchip.com/wwwproducts/en/93LC66C
+[93LC66C PDF]: http://ww1.microchip.com/downloads/en/DeviceDoc/21795E.pdf
 [STM NUCLEO-F767ZI]: https://www.st.com/content/st_com/en/products/evaluation-tools/product-evaluation-tools/mcu-eval-tools/stm32-mcu-eval-tools/stm32-mcu-nucleo/nucleo-f767zi.html
 [Getting started with ST NUCLEO F767ZI Board]: https://github.com/hpaluch/hpaluch.github.io/wiki/Getting-started-with-ST-NUCLEO-F767ZI-Board
 [STM32CubeF7]: https://www.st.com/en/embedded-software/stm32cubef7.html
