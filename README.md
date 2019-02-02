@@ -1,14 +1,14 @@
-# How to read flash 93LC66C to memory
+# How to read EEPROM 93LC66C to memory
 
 Here is an attempt how to read contents
-of [93LC66C] serial flash (see also [93LC66C PDF]) into RAM of
+of [93LC66C] serial EEPROM (see also [93LC66C PDF]) into RAM of
 [STM NUCLEO-F767ZI] development board.
 Please read my [Getting started with ST NUCLEO F767ZI Board]
 for development setup instructions.
 
 Known bugs and limitations:
-* Usable in debugger only (it reads data from flash to array and loops forever)
-* only 16-bit flash data organization is currently supported 
+* Usable in debugger only (it reads data from EEPROM to array and loops forever)
+* only 16-bit EEPROM data organization is currently supported 
   (support for 8-bit data is on the way, but not yet tested)
 
 ## Source tree

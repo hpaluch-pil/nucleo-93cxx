@@ -61,7 +61,7 @@ typedef enum {
 	HPSTM_93C_ORG8   // 8-bit data,  ORG=0 (for chips ending with 'C') or always (for chips ending with 'A')
 } hpstm_93c_org_t;
 
-// complete port (etc) configuration for specific 93c86 FLASH
+// complete port (etc) configuration for specific 93c86 EEPROM
 typedef struct {
 	hpstm_port_def_t csPort;
 	hpstm_port_def_t clkPort;
@@ -329,7 +329,7 @@ int main(void)
 
   HpStm93cInitPorts(&my93lc66Conf);
 
-  // Blue LED2 means = reading flash in progress...
+  // Blue LED2 means = reading EEPROM in progress...
   BSP_LED_On(LED2);
   read_all_flash(&my93lc66Conf);
   BSP_LED_Off(LED2);
