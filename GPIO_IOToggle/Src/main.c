@@ -82,7 +82,7 @@ static void CPU_CACHE_Enable(void);
 // just copied from ..\..\..\UART\UART_Printf\Src\main.c
 static void Error_Handler(void)
 {
-  /* Turn "error" LED3 on and wait forever */
+  /* Turn "error"  red LED3 on and wait forever */
   BSP_LED_On(LED3);
   while (1)
   {
@@ -102,7 +102,7 @@ static void HpStmUDelay(uint32_t usDelay){
 
 static void MyDelay(uint32_t myDelay){
 	HpStmUDelay(10*myDelay); // wait at least 10uS - should be safe everytime...
-	//	HAL_Delay(myDelay);
+	//	HAL_Delay(myDelay);  // this has only 1ms resolution, too big...
 }
 
 static uint32_t HpStmInputValueGPIO(hpstm_port_def_t *portDef)
@@ -115,11 +115,9 @@ static void HpStmOutputValueGPIO(hpstm_port_def_t *portDef, uint32_t active){
 	 HAL_GPIO_WritePin(portDef->addr, portDef->pin, st);
 }
 
-
 static void HpStmInitOutputGPIO(hpstm_port_def_t *portDef){
-	  /* -2- Configure IO in output push-pull mode to drive external LEDs */
 	  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;
-	  GPIO_InitStruct.Pull  = GPIO_NOPULL; // GPIO_PULLUP;
+	  GPIO_InitStruct.Pull  = GPIO_NOPULL; // was GPIO_PULLUP;
 	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
 	  GPIO_InitStruct.Pin = portDef->pin;
@@ -139,7 +137,7 @@ static void HpStmInitInputGPIO(hpstm_port_def_t *portDef){
 }
 
 // Initializes all 93LC66 ports
-// WARNING! GPIO clocks must be still enabled manually before calling this function
+// WARNING! Related GPIO clocks must be still enabled manually before calling this function
 static void HpStm93cInitPorts(hpstm_93c_conf_t *flashConf){
 	  HpStmInitOutputGPIO(&flashConf->csPort);
 	  HpStmInitOutputGPIO(&flashConf->clkPort);
@@ -273,11 +271,6 @@ static void read_all_flash(hpstm_93c_conf_t *flashConf){
   */
 int main(void)
 {
-	uint32_t i=0;
-  /* This sample code shows how to use GPIO HAL API to toggle GPIOB-GPIO_PIN_0 IO
-    in an infinite loop. It is possible to connect a LED between GPIOB-GPIO_PIN_0
-    output and ground via a 330ohm resistor to see this external LED blink.
-    Otherwise an oscilloscope can be used to see the output GPIO signal */
 
   /* Enable the CPU Cache */
   CPU_CACHE_Enable();
@@ -322,24 +315,9 @@ int main(void)
   read_all_flash(&my93lc66Conf);
   BSP_LED_Off(LED2);
 
-  /* -3- Toggle IO in an infinite loop */
   while (1)
   {
-
-/*
-    uint32_t val = 0;
-    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
-    if ( i & 1){
-        HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_13);
-    }
-
-    // Copy input from PF15 to PF14
-    val = MyInputValueGPIO(GPIOF,GPIO_PIN_15);
-    MyOutputValueGPIO(GPIOF,GPIO_PIN_14,val);
-*/
     HAL_Delay(100);
-	i++;
-
   }
 }
 
@@ -390,7 +368,6 @@ static void SystemClock_Config(void)
   {
     while(1) {};
   }
-
 
   /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
      clocks dividers */
