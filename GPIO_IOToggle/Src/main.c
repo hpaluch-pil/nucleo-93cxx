@@ -73,8 +73,35 @@ typedef struct {
 } hpstm_93c_conf_t;
 
 /* Private define ------------------------------------------------------------*/
+// we use defines rather than consts because there are often problems with constant compositions...
+
 #define HPSTM_93C66_NBYTES (512)
 #define HPSTM_93LC86_NBYTES (2048)
+
+// 93Cxx read command
+#define HPSTM_93C_CMD_READ   0x2
+#define HPSTM_93C_CMD_WRITE  0x1
+
+// all 93Cxx seems to have opcode length 2 bits;
+#define HPSTM_93C_OPCODE_BITS 2
+
+
+// number of address bits used by "long" command
+#define  HPSTM_93C_LONG_CMD_ADDR_BITS 2
+// long command has 2 OpCode bits + 2 address bits
+#define HPSTM_93C_LONG_CMD_BITS (HPSTM_93C_OPCODE_BITS+HPSTM_93C_LONG_CMD_ADDR_BITS)
+
+// long command EWEN
+#define HPSTM_93C_LONG_CMD_EWEN 0b0011
+// long command EWDS
+#define HPSTM_93C_LONG_CMD_EWDS 0b0000
+
+// long command ERALL
+#define HPSTM_93C_LONG_CMD_ERALL 0b0010
+
+// wait timeout after ERALL (30ms in data-sheet, using 100ms)
+#define HPSTM_93C_ERALL_WAIT_MS  100
+
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -200,15 +227,6 @@ static uint32_t HpStm93cBitIn(hpstm_93c_conf_t *flashConf){
 	  return bitVal;
 }
 
-// 93Cxx read command
-static const int HPSTM_93C_CMD_READ  = 0x2;
-static const int HPSTM_93C_CMD_WRITE = 0x1;
-static const int HPSTM_93C_CMD_EWEN  = 0x00;
-static const int HPSTM_93C_CMD_EWDS  = 0x00; // distinguished by special address
-
-// all 93Cxx seems to have opcode length 2 bits;
-static const int HPSTM_93C_OPCODE_BITS = 2;
-
 static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t opCode, uint32_t addr){
 	int i=0;
 	uint32_t lastDataIn=0;
@@ -230,23 +248,71 @@ static uint32_t HpStm93cSendCommand(hpstm_93c_conf_t *flashConf, uint32_t opCode
 	return lastDataIn;
 }
 
-// EWEN command use special "address"
-static const uint32_t HPSTM_93C_EWEN_ADDR = 0x3;
+static void HpStm93cWaitAfterWrite(hpstm_93c_conf_t *flashConf, int timeoutMs){
+	int i=0;
+
+	HAL_Delay(1); // wait 1ms after write
+    HpStm93cBitIn(flashConf); // do rather 1 fake clock
+
+    for(i=0;i<=timeoutMs;i++){
+    	HAL_Delay(1); // wait 1ms after write
+    	uint32_t val = HpStm93cBitIn(flashConf);
+    	if (val){
+    		return;
+    	}
+    }
+
+    // oops, timeout....
+    Error_Handler();
+}
+
+// sends "long" command which consists of 2 op-code bits and 2-fake address bits
+// followed by "padding" address bits
+static void HpStm93cSendLongCommand(hpstm_93c_conf_t *flashConf, uint32_t longCmd, uint32_t timeoutMs){
+	int i=0;
+
+	HpStm93cEnableCS(flashConf);
+
+	// all commands start with Start-Bit =1
+	HpStm93cBitOut(flashConf, 1);
+
+	// send command itself
+	for(i=0;i<HPSTM_93C_LONG_CMD_BITS;i++){
+		uint32_t bitVal =  longCmd & ( 1U << (HPSTM_93C_LONG_CMD_BITS-i-1) );
+		HpStm93cBitOut(flashConf, bitVal);
+	}
+
+	// send remainder of address - only number of bits matter. Therefore we always send '0'
+	for(i=0;i<flashConf->addrBits-HPSTM_93C_LONG_CMD_ADDR_BITS;i++){
+		HpStm93cBitOut(flashConf, 0);
+	}
+
+	if (timeoutMs){
+		HpStm93cWaitAfterWrite(flashConf, timeoutMs);
+	}
+
+	HpStm93cDisableCS(flashConf);
+}
 
 // sends EWEN - Erase Write Enable command
 static void HpStm93cEwEn(hpstm_93c_conf_t *flashConf){
-
-	// there is special "address" for write enable
-	uint32_t ewEnAddr = ( HPSTM_93C_EWEN_ADDR << (flashConf->addrBits - 2) );
-	HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_EWEN,ewEnAddr);
-	// EEPROM provides no feedback on status
+	HpStm93cSendLongCommand(flashConf,HPSTM_93C_LONG_CMD_EWEN,0);
 }
 
-// sends EWEN - Erase Write Disable command
+// sends EWDS - Erase Write Disable command
 static void HpStm93cEwDs(hpstm_93c_conf_t *flashConf){
-	// there is special "address" for write disable
-	HpStm93cSendCommand(flashConf, HPSTM_93C_CMD_EWDS,0);
-	// EEPROM provides no feedback on status
+	HpStm93cSendLongCommand(flashConf,HPSTM_93C_LONG_CMD_EWDS,0);
+}
+
+// sends ERALL - Erase All Data
+static void HpStm93cEraseAll(hpstm_93c_conf_t *flashConf){
+	// EWEN - write enable
+	HpStm93cEwEn(flashConf);
+
+	HpStm93cSendLongCommand(flashConf,HPSTM_93C_LONG_CMD_ERALL,HPSTM_93C_ERALL_WAIT_MS);
+
+	// EWDS - write disable
+	HpStm93cEwDs(flashConf);
 }
 
 
@@ -292,26 +358,6 @@ static void HpStm93cReadData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, ui
 	HpStm93cDisableCS(flashConf);
 }
 
-static void HpStm93cWaitAfterWrite(hpstm_93c_conf_t *flashConf){
-	int i=0;
-	const int WRITE_TIMEOUT_MS = 10;
-
-
-	HAL_Delay(1); // wait 1ms after write
-    HpStm93cBitIn(flashConf); // do rather 1 fake clock
-
-    for(i=0;i<WRITE_TIMEOUT_MS;i++){
-    	HAL_Delay(1); // wait 1ms after write
-    	uint32_t val = HpStm93cBitIn(flashConf);
-    	if (val){
-    		return;
-    	}
-    }
-
-    // oops, timeout....
-    Error_Handler();
-
-}
 
 static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, uint8_t *inBuf, int nBytes){
 	int i=0,j=0;
@@ -322,14 +368,11 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 		Error_Handler();
 	}
 
-	// CS enable
-	HpStm93cEnableCS(flashConf);
-
 	// EWEN - write enable
 	HpStm93cEwEn(flashConf);
 
-	HpStm93cDisableCS(flashConf);
-
+	// CS enable
+	HpStm93cEnableCS(flashConf);
 
 	uint32_t val = 0;
 	for(j=0;j<nBytes;j++){
@@ -354,16 +397,12 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 			HpStm93cBitOut(flashConf,myBit);
 		}
 		// there is need to wait after write (around 3ms according to data sheet)
-		HpStm93cWaitAfterWrite(flashConf);
+		HpStm93cWaitAfterWrite(flashConf,0);
 		HpStm93cDisableCS(flashConf);
 	}
 
-	HpStm93cEnableCS(flashConf);
 	// EWDS - write disable
 	HpStm93cEwDs(flashConf);
-
-	// CS disable
-	HpStm93cDisableCS(flashConf);
 
 }
 
@@ -473,6 +512,15 @@ int main(void)
   BSP_LED_On(LED2);
   read_all_flash1(&my93lc66Conf);
   BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED2);
+  HpStm93cEraseAll(&my93lc86Conf);
+  BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED2);
+  read_all_flash2(&my93lc86Conf);
+  BSP_LED_Off(LED2);
+
 
   BSP_LED_On(LED2);
   test_write_flash2(&my93lc86Conf);
