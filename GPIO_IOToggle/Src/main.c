@@ -78,9 +78,10 @@ typedef struct {
 #define HPSTM_93C66_NBYTES (512)
 #define HPSTM_93LC86_NBYTES (2048)
 
-// 93Cxx read command
+// 93Cxx op-codes
 #define HPSTM_93C_CMD_READ   0x2
 #define HPSTM_93C_CMD_WRITE  0x1
+#define HPSTM_93C_CMD_WRAL   0x0
 
 // all 93Cxx seems to have opcode length 2 bits;
 #define HPSTM_93C_OPCODE_BITS 2
@@ -92,15 +93,23 @@ typedef struct {
 #define HPSTM_93C_LONG_CMD_BITS (HPSTM_93C_OPCODE_BITS+HPSTM_93C_LONG_CMD_ADDR_BITS)
 
 // long command EWEN
-#define HPSTM_93C_LONG_CMD_EWEN 0b0011
+#define HPSTM_93C_LONG_CMD_EWEN  0b0011
 // long command EWDS
-#define HPSTM_93C_LONG_CMD_EWDS 0b0000
-
+#define HPSTM_93C_LONG_CMD_EWDS  0b0000
 // long command ERALL
 #define HPSTM_93C_LONG_CMD_ERALL 0b0010
+// long command WRALL
+#define HPSTM_93C_LONG_CMD_WRALL 0b0001
 
-// wait timeout after ERALL (30ms in data-sheet, using 100ms)
-#define HPSTM_93C_ERALL_WAIT_MS  100
+
+// wait timeout after ERALL (15ms in data-sheet, using 50ms)
+#define HPSTM_93C_ERALL_WAIT_MS  50
+
+// wait timeout after WRALL (30ms in data-sheet, using 100ms)
+#define HPSTM_93C_WRALL_WAIT_MS  100
+
+// wait timeout after WRITE (5ms in data-sheet, using 10ms)
+#define HPSTM_93C_WRITE_WAIT_MS  10
 
 
 /* Private macro -------------------------------------------------------------*/
@@ -397,7 +406,7 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 			HpStm93cBitOut(flashConf,myBit);
 		}
 		// there is need to wait after write (around 3ms according to data sheet)
-		HpStm93cWaitAfterWrite(flashConf,0);
+		HpStm93cWaitAfterWrite(flashConf,HPSTM_93C_WRITE_WAIT_MS);
 		HpStm93cDisableCS(flashConf);
 	}
 
@@ -405,6 +414,45 @@ static void HpStm93cWriteData(hpstm_93c_conf_t *flashConf, uint32_t startAddr, u
 	HpStm93cEwDs(flashConf);
 
 }
+
+static void HpStm93cFillAll(hpstm_93c_conf_t *flashConf, uint32_t pattern){
+	int i=0;
+	int nDataBits = flashConf->org == HPSTM_93C_ORG16 ? 16 : 8;
+
+	// EWEN - write enable
+	HpStm93cEwEn(flashConf);
+
+	HpStm93cEnableCS(flashConf);
+
+	// all commands start with Start-Bit =1
+	HpStm93cBitOut(flashConf, 1);
+
+	// send command itself
+	for(i=0;i<HPSTM_93C_LONG_CMD_BITS;i++){
+		uint32_t bitVal =  HPSTM_93C_LONG_CMD_WRALL & ( 1U << (HPSTM_93C_LONG_CMD_BITS-i-1) );
+		HpStm93cBitOut(flashConf, bitVal);
+	}
+
+	// send remainder of address - only number of bits matter. Therefore we always send '0'
+	for(i=0;i<flashConf->addrBits-HPSTM_93C_LONG_CMD_ADDR_BITS;i++){
+		HpStm93cBitOut(flashConf, 0);
+	}
+
+	// write dataBits (pattern that will be written to all cells)
+	for(i=0; i<nDataBits; i++){
+		uint32_t myBit = pattern & ( 1 << (nDataBits-i-1));
+		HpStm93cBitOut(flashConf,myBit);
+	}
+
+	HpStm93cWaitAfterWrite(flashConf, HPSTM_93C_WRALL_WAIT_MS);
+
+	HpStm93cDisableCS(flashConf);
+
+	// EWDS - write disable
+	HpStm93cEwDs(flashConf);
+
+}
+
 
 static uint8_t data8[HPSTM_93C66_NBYTES] = { 0 };
 static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
@@ -428,6 +476,10 @@ static void test_write_flash2(hpstm_93c_conf_t *flashConf){
 
 	HpStm93cWriteData(flashConf,0,test_data,n);
 
+	static uint8_t test_data2[2] = { 0x55, 0xaa };
+	static int n2 = (int)sizeof(test_data2)/sizeof(uint8_t);
+
+	HpStm93cWriteData(flashConf,10,test_data2,n2);
 }
 
 static uint8_t data2_8[HPSTM_93LC86_NBYTES] = { 0 };
@@ -515,6 +567,14 @@ int main(void)
 
   BSP_LED_On(LED2);
   HpStm93cEraseAll(&my93lc86Conf);
+  BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED2);
+  read_all_flash2(&my93lc86Conf);
+  BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED2);
+  HpStm93cFillAll(&my93lc86Conf,0xABCD);
   BSP_LED_Off(LED2);
 
   BSP_LED_On(LED2);
