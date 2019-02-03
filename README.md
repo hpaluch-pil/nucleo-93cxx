@@ -1,7 +1,7 @@
 # How to access EEPROM 93LC66C to memory
 
 Here is an attempt how to access contents
-of [93LC66C] serial EEPROM (see also [93LC66C PDF]) into RAM of
+of [93LC66C] and [93LC86] serial EEPROMs (see also [93LC66C PDF] and [93LC86 PDF]) into RAM of
 [STM NUCLEO-F767ZI] development board.
 Please read my [Getting started with ST NUCLEO F767ZI Board]
 for development setup instructions.
@@ -11,7 +11,7 @@ for development setup instructions.
 > This project also modifies/overwrites data on EEPROM!
 > It is intentional to test C functions.
 >
-> Everything on this page is WITHOUT ANY WARRANTY! Use on your own risk!
+> Everything on this project is WITHOUT ANY WARRANTY! Use on your own risk!
 >
 
 Known bugs and limitations:
@@ -71,6 +71,7 @@ Current schematic is (made in ExpressSCH 6.1.4  - part of ExpressPCB freeware):
 [93LC66C]: https://www.microchip.com/wwwproducts/en/93LC66C
 [93LC66C PDF]: http://ww1.microchip.com/downloads/en/DeviceDoc/21795E.pdf
 [93LC86]: https://www.microchip.com/wwwproducts/en/93LC86
+[93LC86 PDF]: http://ww1.microchip.com/downloads/en/DeviceDoc/21131F.pdf 
 [STM NUCLEO-F767ZI]: https://www.st.com/content/st_com/en/products/evaluation-tools/product-evaluation-tools/mcu-eval-tools/stm32-mcu-eval-tools/stm32-mcu-nucleo/nucleo-f767zi.html
 [Getting started with ST NUCLEO F767ZI Board]: https://github.com/hpaluch/hpaluch.github.io/wiki/Getting-started-with-ST-NUCLEO-F767ZI-Board
 [STM32CubeF7]: https://www.st.com/en/embedded-software/stm32cubef7.html
