@@ -1,15 +1,23 @@
-# How to read EEPROM 93LC66C to memory
+# How to access EEPROM 93LC66C to memory
 
-Here is an attempt how to read contents
+Here is an attempt how to access contents
 of [93LC66C] serial EEPROM (see also [93LC66C PDF]) into RAM of
 [STM NUCLEO-F767ZI] development board.
 Please read my [Getting started with ST NUCLEO F767ZI Board]
 for development setup instructions.
 
+> WARNING!
+>
+> This project also modifies/overwrites data on EEPROM!
+> It is intentional to test C functions.
+>
+> Everything on this page is WITHOUT ANY WARRANTY! Use on your own risk!
+>
+
 Known bugs and limitations:
 * Usable in debugger only (it reads data from EEPROM to array and loops forever)
-* only 16-bit EEPROM data organization is currently supported 
-  (support for 8-bit data is on the way, but not yet tested)
+* only 16-bit EEPROM data organization is tested
+  (8-bit data support is programmed but not yet tested)
 
 ## Source tree
 
@@ -55,8 +63,10 @@ Here are additional connections for the 2nd EEPROM [93LC86]:
 
 Current schematic is (made in ExpressSCH 6.1.4  - part of ExpressPCB freeware):
 
-![STM NUCLEO-F767ZI with 93LCxx EEPROMs](https://github.com/hpaluch-pil/nucleo-93cxx/blob/master/ExpressPCB/nucleo-w-93lc.png?raw=true)
+![Schematic STM NUCLEO-F767ZI with 93LCxx EEPROMs](https://github.com/hpaluch-pil/nucleo-93cxx/blob/master/ExpressPCB/nucleo-w-93lc.png?raw=true)
 
+
+![Image of STM NUCLEO-F767ZI with 93LCxx EEPROMs](https://github.com/hpaluch-pil/nucleo-93cxx/blob/master/images/nucleo-93c-eeprom.jpg?raw=true)
 
 [93LC66C]: https://www.microchip.com/wwwproducts/en/93LC66C
 [93LC66C PDF]: http://ww1.microchip.com/downloads/en/DeviceDoc/21795E.pdf
