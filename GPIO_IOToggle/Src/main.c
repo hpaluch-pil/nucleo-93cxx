@@ -113,6 +113,7 @@ typedef struct {
 
 
 /* Private macro -------------------------------------------------------------*/
+#define HPSTM_MIN(x,y) ( (x) < (y) ? (x) : (y))
 /* Private variables ---------------------------------------------------------*/
 static GPIO_InitTypeDef  GPIO_InitStruct;
 
@@ -145,7 +146,8 @@ static void HpStmUDelay(uint32_t usDelay){
 }
 
 static void MyDelay(uint32_t myDelay){
-	HpStmUDelay(10*myDelay); // wait at least 10uS - should be safe everytime...
+	// HpStmUDelay(100*myDelay); // wait at least 10uS - should be safe everytime...
+	HAL_Delay(1);
 	//	HAL_Delay(myDelay);  // this has only 1ms resolution, too big...
 }
 
@@ -453,20 +455,26 @@ static void HpStm93cFillAll(hpstm_93c_conf_t *flashConf, uint32_t pattern){
 
 }
 
-
-static uint8_t data8[HPSTM_93C66_NBYTES] = { 0 };
-static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
-
-static void read_all_flash1(hpstm_93c_conf_t *flashConf){
+static void read_all_flash(hpstm_93c_conf_t *flashConf, uint8_t *outData, uint32_t nBytes){
 
 	// check for mis-configuration/overflows...
-	if (flashConf->nBytes != n8){
+	if (flashConf->nBytes != nBytes){
 		Error_Handler();
 	}
 
-	memset(data8,0,n8); // just to be sure
+	memset(outData,0,nBytes); // just to be sure
 
-	HpStm93cReadData(flashConf,0,data8,n8);
+	HpStm93cReadData(flashConf,0,outData,nBytes);
+}
+
+static void MyCompareData(uint8_t *inData1, uint8_t *inData2,uint32_t nBytes){
+	int i=0;
+
+	for(i=0;i<nBytes;i++){
+		if (inData1[i]!=inData2[i]){
+			Error_Handler();
+		}
+	}
 }
 
 static void test_write_flash2(hpstm_93c_conf_t *flashConf){
@@ -482,21 +490,27 @@ static void test_write_flash2(hpstm_93c_conf_t *flashConf){
 	HpStm93cWriteData(flashConf,10,test_data2,n2);
 }
 
-static uint8_t data2_8[HPSTM_93LC86_NBYTES] = { 0 };
-static int n2_8 = (int)sizeof(data2_8)/sizeof(uint8_t);
-
-static void read_all_flash2(hpstm_93c_conf_t *flashConf){
-
-	// check for mis-configuration/overflows...
-	if (flashConf->nBytes != n2_8){
-		Error_Handler();
+static void MyNucleoBlinkLED(Led_TypeDef Led,int nTimes,int delayMs){
+	int i=0;
+	for(i=0;i<nTimes;i++){
+		BSP_LED_On(Led);
+		HAL_Delay(delayMs);
+		BSP_LED_Off(Led);
+		HAL_Delay(delayMs);
 	}
-
-	memset(data2_8,0,n2_8); // just to be sure
-
-	HpStm93cReadData(flashConf,0,data2_8,n2_8);
 }
 
+static uint8_t data8[HPSTM_93C66_NBYTES] = { 0 };
+static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
+
+//#define FLASH2_IS_93C66
+
+#ifdef FLASH2_IS_93C66
+static uint8_t data2_8[HPSTM_93C66_NBYTES] = { 0 };
+#else
+static uint8_t data2_8[HPSTM_93LC86_NBYTES] = { 0 };
+#endif
+static int n2_8 = (int)sizeof(data2_8)/sizeof(uint8_t);
 
 
 /**
@@ -547,50 +561,70 @@ int main(void)
 
   HpStm93cInitPorts(&my93lc66Conf);
 
-  hpstm_93c_conf_t my93lc86Conf = {
+  hpstm_93c_conf_t my93lcxxConf = {
 		  .csPort   = { GPIOE, GPIO_PIN_10 }, // PE10 wil be CS of 93LC86
 		  .clkPort  = { GPIOE, GPIO_PIN_12},  // PE12 will be CLK of 93LC86
 		  .dPort    = { GPIOE, GPIO_PIN_14},  // PE14 will be D of 93LC86
 		  .qPort    = { GPIOE, GPIO_PIN_15},  // PE15 will be Q of 93LC86
 		  .org      = HPSTM_93C_ORG16,
+#ifdef FLASH2_IS_93C66
+		  .addrBits = 8,
+		  .nBytes   = HPSTM_93C66_NBYTES
+#else
 		  .addrBits = 10,
 		  .nBytes   = HPSTM_93LC86_NBYTES
+#endif
   };
 
-  HpStm93cInitPorts(&my93lc86Conf);
+  HpStm93cInitPorts(&my93lcxxConf);
 
+  MyNucleoBlinkLED(LED2,2,500);
 
   // Blue LED2 means = reading EEPROM in progress...
   BSP_LED_On(LED2);
-  read_all_flash1(&my93lc66Conf);
+  read_all_flash(&my93lc66Conf,data8,n8);
+  BSP_LED_Off(LED2);
+
+#if 1
+  BSP_LED_On(LED2);
+  HpStm93cEraseAll(&my93lcxxConf);
   BSP_LED_Off(LED2);
 
   BSP_LED_On(LED2);
-  HpStm93cEraseAll(&my93lc86Conf);
+  read_all_flash(&my93lcxxConf,data2_8,n2_8);
   BSP_LED_Off(LED2);
 
   BSP_LED_On(LED2);
-  read_all_flash2(&my93lc86Conf);
+  HpStm93cFillAll(&my93lcxxConf,0xABCD);
   BSP_LED_Off(LED2);
 
   BSP_LED_On(LED2);
-  HpStm93cFillAll(&my93lc86Conf,0xABCD);
+  read_all_flash(&my93lcxxConf,data2_8,n2_8);
   BSP_LED_Off(LED2);
+
+  // initialize target buffer to pattern data - so we can see it if target is larger
+  memset(data2_8,0xCA,n2_8);
+
+  // target EEPROM buffer size must be equal or larger than source EEPROM
+  if ( n2_8 < n8){
+	  Error_Handler();
+  }
+
+  // copy content of source EEPROM to target EEPROM
+  memcpy(data2_8,data8,n8);
 
   BSP_LED_On(LED2);
-  read_all_flash2(&my93lc86Conf);
+  HpStm93cWriteData(&my93lcxxConf,0,data2_8,n2_8);
   BSP_LED_Off(LED2);
-
+#else
+  MyNucleoBlinkLED(LED2,5,200);
+#endif
 
   BSP_LED_On(LED2);
-  test_write_flash2(&my93lc86Conf);
+  read_all_flash(&my93lcxxConf,data2_8,n2_8);
   BSP_LED_Off(LED2);
 
-
-  BSP_LED_On(LED2);
-  read_all_flash2(&my93lc86Conf);
-  BSP_LED_Off(LED2);
-
+  MyCompareData(data8,data2_8,HPSTM_MIN(n8,n2_8));
 
   while (1)
   {

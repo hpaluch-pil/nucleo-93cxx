@@ -8,8 +8,7 @@ for development setup instructions.
 
 > WARNING!
 >
-> This project also modifies/overwrites data on EEPROM!
-> It is intentional to test C functions.
+> Currently this code copies data from EEPROM U1 to EEPROM U2.
 >
 > Everything on this project is WITHOUT ANY WARRANTY! Use on your own risk!
 >
@@ -18,6 +17,8 @@ Known bugs and limitations:
 * Usable in debugger only (it reads data from EEPROM to array and loops forever)
 * only 16-bit EEPROM data organization is tested
   (8-bit data support is programmed but not yet tested)
+* still have troubles to find proper micro-seconds delay function - 
+  currently using ms delay as workaround...
 
 ## Source tree
 
