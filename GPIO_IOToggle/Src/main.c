@@ -134,7 +134,7 @@ void Error_Handler(void)
 
 static void MyDelay(uint32_t myDelay){
 	// HpStmUDelay(100*myDelay); // wait at least 10uS - should be safe everytime...
-	Delay_us(100*myDelay);
+	Delay_us(10*myDelay);
 	//HAL_Delay(1);
 	//	HAL_Delay(myDelay);  // this has only 1ms resolution, too big...
 }
