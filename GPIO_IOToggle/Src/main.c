@@ -123,7 +123,7 @@ static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
 // just copied from ..\..\..\UART\UART_Printf\Src\main.c
-static void Error_Handler(void)
+void Error_Handler(void)
 {
   /* Turn "error"  red LED3 on and wait forever */
   BSP_LED_On(LED3);
@@ -132,22 +132,10 @@ static void Error_Handler(void)
   }
 }
 
-static void HpStmUDelay(uint32_t usDelay){
-	// grabbed from: https://github.com/micropython/micropython/blob/master/ports/stm32/systick.c
-	// MIT license
-
-	// WARNING! I don't understand this code :-)
-
-    // IRQs disabled, so need to use a busy loop for the delay
-    // sys freq is always a multiple of 2MHz, so division here won't lose precision
-    const uint32_t ucount = HAL_RCC_GetSysClockFreq() / 2000000 * usDelay / 2;
-    for (uint32_t count = 0; ++count <= ucount;) {
-    }
-}
-
 static void MyDelay(uint32_t myDelay){
 	// HpStmUDelay(100*myDelay); // wait at least 10uS - should be safe everytime...
-	HAL_Delay(1);
+	Delay_us(100*myDelay);
+	//HAL_Delay(1);
 	//	HAL_Delay(myDelay);  // this has only 1ms resolution, too big...
 }
 
@@ -475,19 +463,6 @@ static void MyCompareData(uint8_t *inData1, uint8_t *inData2,uint32_t nBytes){
 			Error_Handler();
 		}
 	}
-}
-
-static void test_write_flash2(hpstm_93c_conf_t *flashConf){
-
-	static uint8_t test_data[4] = { 0x12, 0x34, 0x56, 0x78 };
-	static int n = (int)sizeof(test_data)/sizeof(uint8_t);
-
-	HpStm93cWriteData(flashConf,0,test_data,n);
-
-	static uint8_t test_data2[2] = { 0x55, 0xaa };
-	static int n2 = (int)sizeof(test_data2)/sizeof(uint8_t);
-
-	HpStm93cWriteData(flashConf,10,test_data2,n2);
 }
 
 static void MyNucleoBlinkLED(Led_TypeDef Led,int nTimes,int delayMs){
