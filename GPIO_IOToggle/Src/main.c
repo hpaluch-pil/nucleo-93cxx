@@ -507,10 +507,13 @@ static int n8 = (int)sizeof(data8)/sizeof(uint8_t);
 
 #ifdef FLASH2_IS_93C66
 static uint8_t data2_8[HPSTM_93C66_NBYTES] = { 0 };
+static uint8_t data3_8[HPSTM_93C66_NBYTES] = { 0 };
 #else
 static uint8_t data2_8[HPSTM_93LC86_NBYTES] = { 0 };
+static uint8_t data3_8[HPSTM_93LC86_NBYTES] = { 0 };
 #endif
 static int n2_8 = (int)sizeof(data2_8)/sizeof(uint8_t);
+static int n3_8 = (int)sizeof(data3_8)/sizeof(uint8_t);
 
 
 /**
@@ -594,6 +597,14 @@ int main(void)
   read_all_flash(&my93lcxxConf,data2_8,n2_8);
   BSP_LED_Off(LED2);
 
+  memset(data3_8,0xff,n3_8);
+
+  if (n2_8 != n3_8){
+	  Error_Handler();
+  }
+
+  MyCompareData(data2_8,data3_8,n3_8);
+
   BSP_LED_On(LED2);
   HpStm93cFillAll(&my93lcxxConf,0xABCD);
   BSP_LED_Off(LED2);
@@ -601,6 +612,13 @@ int main(void)
   BSP_LED_On(LED2);
   read_all_flash(&my93lcxxConf,data2_8,n2_8);
   BSP_LED_Off(LED2);
+
+  for(int i=0;i<n3_8;i++){
+	  uint8_t val = (i&1)==0 ? 0xAB : 0xCD;
+	  data3_8[i] = val;
+  }
+
+  MyCompareData(data2_8,data3_8,n3_8);
 
   // initialize target buffer to pattern data - so we can see it if target is larger
   memset(data2_8,0xCA,n2_8);
