@@ -14,11 +14,11 @@ for development setup instructions.
 >
 
 Known bugs and limitations:
-* Usable in debugger only (it reads data from EEPROM to array and loops forever)
+* it once copies data from U1 to U2 and then loops forever.
 * only 16-bit EEPROM data organization is tested
   (8-bit data support is programmed but not yet tested)
-* still have troubles to find proper micro-seconds delay function - 
-  currently using ms delay as workaround...
+*  now using micro-second delay code from [LonelyWolf STM32 GitHub]
+   (the code has been heavily modified for [STM32CubeF7] though)
 
 ## Source tree
 
@@ -36,7 +36,7 @@ extract `en.stm32cubef7.zip` from [STM32CubeF7]:
 
 Currently we are connecting to EEPROMs for debug purposes.
 
-Here is table how the 1st [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
+Here is table how the 1st [93LC66C] (data source) should be connected to [STM NUCLEO-F767ZI]:
 
 |Nucleo Conn.|Nucleo PIN|Nucleo Func|93LC66C PIN|
 |------------|----------|-----------|-----------|
@@ -53,7 +53,7 @@ Here is table how the 1st [93LC66C] should be connected to [STM NUCLEO-F767ZI]:
     input (no need to worry about CS signal load).
     See [STM32 Nucleo-144 boards], `Figure 20. Extension connectors` for details.
 
-Here are additional connections for the 2nd EEPROM [93LC86]:
+Here are additional connections for the 2nd EEPROM [93LC86] (data target):
 
 |Nucleo Conn.|Nucleo PIN|Nucleo Func|93LC86 PIN|
 |------------|----------|-----------|----------|
@@ -78,3 +78,5 @@ Current schematic is (made in ExpressSCH 6.1.4  - part of ExpressPCB freeware):
 [STM32CubeF7]: https://www.st.com/en/embedded-software/stm32cubef7.html
 [Op-Amp TSV631]: https://www.st.com/en/amplifiers-and-comparators/tsv631.html
 [STM32 Nucleo-144 boards]: https://www.st.com/content/ccc/resource/technical/document/user_manual/group0/26/49/90/2e/33/0d/4a/da/DM00244518/files/DM00244518.pdf/jcr:content/translations/en.DM00244518.pdf
+[LonelyWolf STM32 GitHub]: https://github.com/LonelyWolf/stm32
+

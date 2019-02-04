@@ -1,9 +1,12 @@
 /**
   ******************************************************************************
   * @file    GPIO/GPIO_IOToggle/Src/main.c
-  * @author  modified by Henryk Paluch of Pickering Interfaces, Ltd.
-  * @author  MCD Application Team
-  * @brief   reads content of 93LC66C 16-bit org into RAM
+  * @author  Henryk Paluch of Pickering Interfaces, Ltd.
+  * @author  Lonely Wolf - modified delay routines comes from
+  *                        his project https://github.com/LonelyWolf/stm32/blob/master/MatrixKeyboard/delay.c
+  * @author  MCD Application Team (GPIO_IOToggle example)
+  * @brief   copies content from U1 93LC66B/C 16-bit org to U2 93LC86
+  *          the U2 is also used to test ERAL and WRAL operations
   ******************************************************************************
   * @attention
   *
