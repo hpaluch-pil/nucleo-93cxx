@@ -1,4 +1,4 @@
-# How to access EEPROM 93LC66C to memory
+# How to access EEPROM 93LC66C
 
 Here is an attempt how to access contents
 of [93LC66C] and [93LC86] serial EEPROMs (see also [93LC66C PDF] and [93LC86 PDF]) into RAM of
